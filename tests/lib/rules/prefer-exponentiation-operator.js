@@ -40,7 +40,7 @@ function invalid(code, output) {
 // Tests
 //------------------------------------------------------------------------------
 
-const ruleTester = new RuleTester({ parserOptions: { ecmaVersion: 2018 } });
+const ruleTester = new RuleTester({ parserOptions: { ecmaVersion: 2020 } });
 
 ruleTester.run("prefer-exponentiation-operator", rule, {
     valid: [
@@ -218,6 +218,8 @@ ruleTester.run("prefer-exponentiation-operator", rule, {
         invalid("Math.pow(a, -b)", "a**-b"),
         invalid("Math.pow(-2, 3)", "(-2)**3"),
         invalid("Math.pow(2, -3)", "2**-3"),
+        invalid("async () => Math.pow(await a, b)", "async () => (await a)**b"),
+        invalid("async () => Math.pow(a, await b)", "async () => a**await b"),
 
         // base and exponent with a lower precedence
         invalid("Math.pow(a * b, c)", "(a * b)**c"),
@@ -346,6 +348,13 @@ ruleTester.run("prefer-exponentiation-operator", rule, {
         invalid("Math.pow(a, b/**/)", null),
         invalid("Math.pow(a, b//\n)", null),
         invalid("Math.pow(a, b)/* comment */;", "a**b/* comment */;"),
-        invalid("Math.pow(a, b)// comment\n;", "a**b// comment\n;")
+        invalid("Math.pow(a, b)// comment\n;", "a**b// comment\n;"),
+
+        // Optional chaining
+        invalid("Math.pow?.(a, b)", "a**b"),
+        invalid("Math?.pow(a, b)", "a**b"),
+        invalid("Math?.pow?.(a, b)", "a**b"),
+        invalid("(Math?.pow)(a, b)", "a**b"),
+        invalid("(Math?.pow)?.(a, b)", "a**b")
     ]
 });

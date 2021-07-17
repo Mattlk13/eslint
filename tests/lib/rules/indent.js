@@ -2206,6 +2206,26 @@ ruleTester.run("indent", rule, {
         },
         {
             code: unIndent`
+              condition1
+                ? condition2
+                  ? Promise.resolve(1)
+                  : Promise.resolve(2)
+                : Promise.resolve(3)
+            `,
+            options: [2, { offsetTernaryExpressions: true }]
+        },
+        {
+            code: unIndent`
+              condition1
+                ? Promise.resolve(1)
+                : condition2
+                  ? Promise.resolve(2)
+                  : Promise.resolve(3)
+            `,
+            options: [2, { offsetTernaryExpressions: true }]
+        },
+        {
+            code: unIndent`
               condition
               \t? () => {
               \t\t\treturn true
@@ -4125,7 +4145,7 @@ ruleTester.run("indent", rule, {
         //----------------------------------------------------------------------
         // JSX tests
         // https://github.com/eslint/eslint/issues/8425
-        // Some of the following tests are adapted from the the tests in eslint-plugin-react.
+        // Some of the following tests are adapted from the tests in eslint-plugin-react.
         // License: https://github.com/yannickcr/eslint-plugin-react/blob/7ca9841f22d599f447a27ef5b2a97def9229d6c8/LICENSE
         //----------------------------------------------------------------------
 
@@ -5724,6 +5744,105 @@ ruleTester.run("indent", rule, {
             `,
             options: [4, { MemberExpression: 2 }],
             parserOptions: { ecmaVersion: 2015 }
+        },
+        {
+            code: unIndent`
+                const foo = async (arg1,
+                                   arg2) =>
+                {
+                  return arg1 + arg2;
+                }
+            `,
+            options: [2, { FunctionDeclaration: { parameters: "first" }, FunctionExpression: { parameters: "first" } }]
+        },
+        {
+            code: unIndent`
+                const foo = async /* some comments */(arg1,
+                                                      arg2) =>
+                {
+                  return arg1 + arg2;
+                }
+            `,
+            options: [2, { FunctionDeclaration: { parameters: "first" }, FunctionExpression: { parameters: "first" } }]
+        },
+        {
+            code: unIndent`
+                const a = async
+                b => {}
+            `,
+            options: [2]
+        },
+        {
+            code: unIndent`
+                const foo = (arg1,
+                             arg2) => async (arr1,
+                                             arr2) =>
+                {
+                  return arg1 + arg2;
+                }
+            `,
+            options: [2, { FunctionDeclaration: { parameters: "first" }, FunctionExpression: { parameters: "first" } }]
+        },
+        {
+            code: unIndent`
+                const foo = async (arg1,
+                  arg2) =>
+                {
+                  return arg1 + arg2;
+                }
+            `,
+            options: [2]
+        },
+        {
+            code: unIndent`
+                const foo = async /*comments*/(arg1,
+                  arg2) =>
+                {
+                  return arg1 + arg2;
+                }
+            `,
+            options: [2]
+        },
+        {
+            code: unIndent`
+                const foo = async (arg1,
+                        arg2) =>
+                {
+                  return arg1 + arg2;
+                }
+            `,
+            options: [2, { FunctionDeclaration: { parameters: 4 }, FunctionExpression: { parameters: 4 } }]
+        },
+        {
+            code: unIndent`
+                const foo = (arg1,
+                        arg2) =>
+                {
+                  return arg1 + arg2;
+                }
+            `,
+            options: [2, { FunctionDeclaration: { parameters: 4 }, FunctionExpression: { parameters: 4 } }]
+        },
+        {
+            code: unIndent`
+                async function fn(ar1,
+                                  ar2){}
+            `,
+            options: [2, { FunctionDeclaration: { parameters: "first" }, FunctionExpression: { parameters: "first" } }]
+        },
+        {
+            code: unIndent`
+                async function /* some comments */ fn(ar1,
+                                                      ar2){}
+            `,
+            options: [2, { FunctionDeclaration: { parameters: "first" }, FunctionExpression: { parameters: "first" } }]
+        },
+        {
+            code: unIndent`
+                async  /* some comments */  function fn(ar1,
+                                                        ar2){}
+            `,
+            options: [2, { FunctionDeclaration: { parameters: "first" }, FunctionExpression: { parameters: "first" } }]
         }
     ],
 
@@ -9726,7 +9845,7 @@ ruleTester.run("indent", rule, {
 
         //----------------------------------------------------------------------
         // JSX tests
-        // Some of the following tests are adapted from the the tests in eslint-plugin-react.
+        // Some of the following tests are adapted from the tests in eslint-plugin-react.
         // License: https://github.com/yannickcr/eslint-plugin-react/blob/7ca9841f22d599f447a27ef5b2a97def9229d6c8/LICENSE
         //----------------------------------------------------------------------
 
@@ -11373,6 +11492,140 @@ ruleTester.run("indent", rule, {
                 [2, 0, 4, "Punctuator"],
                 [5, 4, 0, "Identifier"],
                 [6, 0, 4, "Punctuator"]
+            ])
+        },
+
+        // Optional chaining
+        {
+            code: unIndent`
+                obj
+                ?.prop
+                ?.[key]
+                ?.
+                [key]
+            `,
+            output: unIndent`
+                obj
+                    ?.prop
+                    ?.[key]
+                    ?.
+                        [key]
+            `,
+            options: [4],
+            parserOptions: { ecmaVersion: 2020 },
+            errors: expectedErrors([
+                [2, 4, 0, "Punctuator"],
+                [3, 4, 0, "Punctuator"],
+                [4, 4, 0, "Punctuator"],
+                [5, 8, 0, "Punctuator"]
+            ])
+        },
+        {
+            code: unIndent`
+                (
+                    longSomething
+                        ?.prop
+                        ?.[key]
+                )
+                ?.prop
+                ?.[key]
+            `,
+            output: unIndent`
+                (
+                    longSomething
+                        ?.prop
+                        ?.[key]
+                )
+                    ?.prop
+                    ?.[key]
+            `,
+            options: [4],
+            parserOptions: { ecmaVersion: 2020 },
+            errors: expectedErrors([
+                [6, 4, 0, "Punctuator"],
+                [7, 4, 0, "Punctuator"]
+            ])
+        },
+        {
+            code: unIndent`
+                obj
+                ?.(arg)
+                ?.
+                (arg)
+            `,
+            output: unIndent`
+                obj
+                    ?.(arg)
+                    ?.
+                    (arg)
+            `,
+            options: [4],
+            parserOptions: { ecmaVersion: 2020 },
+            errors: expectedErrors([
+                [2, 4, 0, "Punctuator"],
+                [3, 4, 0, "Punctuator"],
+                [4, 4, 0, "Punctuator"]
+            ])
+        },
+        {
+            code: unIndent`
+                (
+                    longSomething
+                        ?.(arg)
+                        ?.(arg)
+                )
+                ?.(arg)
+                ?.(arg)
+            `,
+            output: unIndent`
+                (
+                    longSomething
+                        ?.(arg)
+                        ?.(arg)
+                )
+                    ?.(arg)
+                    ?.(arg)
+            `,
+            options: [4],
+            parserOptions: { ecmaVersion: 2020 },
+            errors: expectedErrors([
+                [6, 4, 0, "Punctuator"],
+                [7, 4, 0, "Punctuator"]
+            ])
+        },
+        {
+            code: unIndent`
+                const foo = async (arg1,
+                                    arg2) =>
+                {
+                  return arg1 + arg2;
+                }
+            `,
+            output: unIndent`
+                const foo = async (arg1,
+                                   arg2) =>
+                {
+                  return arg1 + arg2;
+                }
+            `,
+            options: [2, { FunctionDeclaration: { parameters: "first" }, FunctionExpression: { parameters: "first" } }],
+            parserOptions: { ecmaVersion: 2020 },
+            errors: expectedErrors([
+                [2, 19, 20, "Identifier"]
+            ])
+        },
+        {
+            code: unIndent`
+                const a = async
+                 b => {}
+            `,
+            output: unIndent`
+                const a = async
+                b => {}
+            `,
+            options: [2],
+            errors: expectedErrors([
+                [2, 0, 1, "Identifier"]
             ])
         }
     ]

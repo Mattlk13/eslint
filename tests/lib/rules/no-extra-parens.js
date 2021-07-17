@@ -44,7 +44,7 @@ function invalid(code, output, type, line, config) {
 
 const ruleTester = new RuleTester({
     parserOptions: {
-        ecmaVersion: 2020,
+        ecmaVersion: 2021,
         ecmaFeatures: {
             jsx: true
         }
@@ -96,6 +96,8 @@ ruleTester.run("no-extra-parens", rule, {
         "(new A)()",
         "(new (Foo || Bar))()",
         "(new new foo())()",
+        "new (new A)()",
+        "new (new a.b)()",
         "new (new new foo())(bar)",
         "(new foo).bar",
         "(new foo)[bar]",
@@ -190,6 +192,13 @@ ruleTester.run("no-extra-parens", rule, {
 
         // special cases
         "(0).a",
+        "(123).a",
+        "(08).a",
+        "(09).a",
+        "(018).a",
+        "(012934).a",
+        "(5_000).a",
+        "(5_000_00).a",
         "(function(){ }())",
         "({a: function(){}}.a());",
         "({a:0}.a ? b : c)",
@@ -356,11 +365,23 @@ ruleTester.run("no-extra-parens", rule, {
             "}"
         ].join("\n"),
 
+        // linebreaks before postfix update operators are not allowed
+        "(a\n)++",
+        "(a\n)--",
+        "(a\n\n)++",
+        "(a.b\n)--",
+        "(a\n.b\n)++",
+        "(a[\nb\n]\n)--",
+        "(a[b]\n\n)++",
+
         // async/await
         "async function a() { await (a + b) }",
         "async function a() { await (a + await b) }",
         "async function a() { (await a)() }",
         "async function a() { new (await a) }",
+        "async function a() { await (a ** b) }",
+        "async function a() { (await a) ** b }",
+
         { code: "(foo instanceof bar) instanceof baz", options: ["all", { nestedBinaryExpressions: false }] },
         { code: "(foo in bar) in baz", options: ["all", { nestedBinaryExpressions: false }] },
         { code: "(foo + bar) + baz", options: ["all", { nestedBinaryExpressions: false }] },
@@ -578,10 +599,44 @@ ruleTester.run("no-extra-parens", rule, {
             options: ["functions"]
         },
         "(let)[foo]",
-        "for ((let) in foo);",
+
+        // ForStatement#init expression cannot start with `let[`. It would be parsed as a `let` declaration with array pattern, or a syntax error.
+        "for ((let[a]);;);",
+        "for ((let)[a];;);",
+        "for ((let[a] = 1);;);",
+        "for ((let[a]) = 1;;);",
+        "for ((let)[a] = 1;;);",
+        "for ((let[a, b] = foo);;);",
+        "for ((let[a].b = 1);;);",
+        "for ((let[a].b) = 1;;);",
+        "for ((let[a]).b = 1;;);",
+        "for ((let)[a].b = 1;;);",
+        "for ((let[a])();;);",
+        "for ((let)[a]();;);",
+        "for ((let[a]) + b;;);",
+
+        // ForInStatement#left expression cannot start with `let[`. It would be parsed as a `let` declaration with array pattern, or a syntax error.
         "for ((let[foo]) in bar);",
         "for ((let)[foo] in bar);",
         "for ((let[foo].bar) in baz);",
+        "for ((let[foo]).bar in baz);",
+        "for ((let)[foo].bar in baz);",
+
+        // ForOfStatement#left expression cannot start with `let`. It's explicitly forbidden by the specification.
+        "for ((let) of foo);",
+        "for ((let).foo of bar);",
+        "for ((let.foo) of bar);",
+        "for ((let[foo]) of bar);",
+        "for ((let)[foo] of bar);",
+        "for ((let.foo.bar) of baz);",
+        "for ((let.foo).bar of baz);",
+        "for ((let).foo.bar of baz);",
+        "for ((let[foo].bar) of baz);",
+        "for ((let[foo]).bar of baz);",
+        "for ((let)[foo].bar of baz);",
+        "for ((let)().foo of bar);",
+        "for ((let()).foo of bar);",
+        "for ((let().foo) of bar);",
 
         // https://github.com/eslint/eslint/issues/11706 (also in invalid[])
         "for (let a = (b in c); ;);",
@@ -612,6 +667,14 @@ ruleTester.run("no-extra-parens", rule, {
         "for (; a; a); a; a;",
         "for (let a = (b && c) === d; ;);",
 
+        "new (a()).b.c;",
+        "new (a().b).c;",
+        "new (a().b.c);",
+        "new (a().b().d);",
+        "new a().b().d;",
+        "new (a(b()).c)",
+        "new (a.b()).c",
+
         // Nullish coalescing
         { code: "var v = (a ?? b) || c", parserOptions: { ecmaVersion: 2020 } },
         { code: "var v = a ?? (b || c)", parserOptions: { ecmaVersion: 2020 } },
@@ -620,7 +683,32 @@ ruleTester.run("no-extra-parens", rule, {
         { code: "var v = (a || b) ?? c", parserOptions: { ecmaVersion: 2020 } },
         { code: "var v = a || (b ?? c)", parserOptions: { ecmaVersion: 2020 } },
         { code: "var v = (a && b) ?? c", parserOptions: { ecmaVersion: 2020 } },
-        { code: "var v = a && (b ?? c)", parserOptions: { ecmaVersion: 2020 } }
+        { code: "var v = a && (b ?? c)", parserOptions: { ecmaVersion: 2020 } },
+
+        // Optional chaining
+        { code: "var v = (obj?.aaa).bbb", parserOptions: { ecmaVersion: 2020 } },
+        { code: "var v = (obj?.aaa)()", parserOptions: { ecmaVersion: 2020 } },
+        { code: "var v = new (obj?.aaa)()", parserOptions: { ecmaVersion: 2020 } },
+        { code: "var v = new (obj?.aaa)", parserOptions: { ecmaVersion: 2020 } },
+        { code: "var v = (obj?.aaa)`template`", parserOptions: { ecmaVersion: 2020 } },
+        { code: "var v = (obj?.()).bbb", parserOptions: { ecmaVersion: 2020 } },
+        { code: "var v = (obj?.())()", parserOptions: { ecmaVersion: 2020 } },
+        { code: "var v = new (obj?.())()", parserOptions: { ecmaVersion: 2020 } },
+        { code: "var v = new (obj?.())", parserOptions: { ecmaVersion: 2020 } },
+        { code: "var v = (obj?.())`template`", parserOptions: { ecmaVersion: 2020 } },
+        { code: "(obj?.aaa).bbb = 0", parserOptions: { ecmaVersion: 2020 } },
+        { code: "var foo = (function(){})?.()", parserOptions: { ecmaVersion: 2020 } },
+        { code: "var foo = (function(){}?.())", parserOptions: { ecmaVersion: 2020 } },
+        {
+            code: "var foo = (function(){})?.call()",
+            options: ["all", { enforceForFunctionPrototypeMethods: false }],
+            parserOptions: { ecmaVersion: 2020 }
+        },
+        {
+            code: "var foo = (function(){}?.call())",
+            options: ["all", { enforceForFunctionPrototypeMethods: false }],
+            parserOptions: { ecmaVersion: 2020 }
+        }
     ],
 
     invalid: [
@@ -715,6 +803,18 @@ ruleTester.run("no-extra-parens", rule, {
         invalid("+((bar-foo))", "+(bar-foo)", "BinaryExpression"),
         invalid("++(foo)", "++foo", "Identifier"),
         invalid("--(foo)", "--foo", "Identifier"),
+        invalid("++\n(foo)", "++\nfoo", "Identifier"),
+        invalid("--\n(foo)", "--\nfoo", "Identifier"),
+        invalid("++(\nfoo)", "++\nfoo", "Identifier"),
+        invalid("--(\nfoo)", "--\nfoo", "Identifier"),
+        invalid("(foo)++", "foo++", "Identifier"),
+        invalid("(foo)--", "foo--", "Identifier"),
+        invalid("((foo)\n)++", "(foo\n)++", "Identifier"),
+        invalid("((foo\n))--", "(foo\n)--", "Identifier"),
+        invalid("((foo\n)\n)++", "(foo\n\n)++", "Identifier"),
+        invalid("(a\n.b)--", "a\n.b--", "MemberExpression"),
+        invalid("(a.\nb)++", "a.\nb++", "MemberExpression"),
+        invalid("(a\n[\nb\n])--", "a\n[\nb\n]--", "MemberExpression"),
         invalid("(a || b) ? c : d", "a || b ? c : d", "LogicalExpression"),
         invalid("a ? (b = c) : d", "a ? b = c : d", "AssignmentExpression"),
         invalid("a ? b : (c = d)", "a ? b : c = d", "AssignmentExpression"),
@@ -742,9 +842,14 @@ ruleTester.run("no-extra-parens", rule, {
         invalid("(a).b", "a.b", "Identifier"),
         invalid("(0)[a]", "0[a]", "Literal"),
         invalid("(0.0).a", "0.0.a", "Literal"),
+        invalid("(123.4).a", "123.4.a", "Literal"),
+        invalid("(0.0_0).a", "0.0_0.a", "Literal"),
         invalid("(0xBEEF).a", "0xBEEF.a", "Literal"),
+        invalid("(0xBE_EF).a", "0xBE_EF.a", "Literal"),
         invalid("(1e6).a", "1e6.a", "Literal"),
         invalid("(0123).a", "0123.a", "Literal"),
+        invalid("(08.1).a", "08.1.a", "Literal"),
+        invalid("(09.).a", "09..a", "Literal"),
         invalid("a[(function() {})]", "a[function() {}]", "FunctionExpression"),
         invalid("new (function(){})", "new function(){}", "FunctionExpression"),
         invalid("new (\nfunction(){}\n)", "new \nfunction(){}\n", "FunctionExpression", 1),
@@ -759,6 +864,7 @@ ruleTester.run("no-extra-parens", rule, {
         invalid("(new foo(bar)).baz", "new foo(bar).baz", "NewExpression"),
         invalid("(new foo.bar()).baz", "new foo.bar().baz", "NewExpression"),
         invalid("(new foo.bar()).baz()", "new foo.bar().baz()", "NewExpression"),
+        invalid("new a[(b()).c]", "new a[b().c]", "CallExpression"),
 
         invalid("(a)()", "a()", "Identifier"),
         invalid("(a.b)()", "a.b()", "MemberExpression"),
@@ -772,6 +878,18 @@ ruleTester.run("no-extra-parens", rule, {
         invalid("((new A))()", "(new A)()", "NewExpression"),
         invalid("new (foo\n.baz\n.bar\n.foo.baz)", "new foo\n.baz\n.bar\n.foo.baz", "MemberExpression"),
         invalid("new (foo.baz.bar.baz)", "new foo.baz.bar.baz", "MemberExpression"),
+        invalid("new ((a.b())).c", "new (a.b()).c", "CallExpression"),
+        invalid("new ((a().b)).c", "new (a().b).c", "MemberExpression"),
+        invalid("new ((a().b().d))", "new (a().b().d)", "MemberExpression"),
+        invalid("new ((a())).b.d", "new (a()).b.d", "CallExpression"),
+        invalid("new (a.b).d;", "new a.b.d;", "MemberExpression"),
+        invalid("new (new A())();", "new new A()();", "NewExpression"),
+        invalid("new (new A());", "new new A();", "NewExpression"),
+        invalid("new (new A);", "new new A;", "NewExpression"),
+        invalid("new (new a.b);", "new new a.b;", "NewExpression"),
+        invalid("(a().b).d;", "a().b.d;", "MemberExpression"),
+        invalid("(a.b()).d;", "a.b().d;", "CallExpression"),
+        invalid("(a.b).d;", "a.b.d;", "MemberExpression"),
 
         invalid("0, (_ => 0)", "0, _ => 0", "ArrowFunctionExpression", 1),
         invalid("(_ => 0), 0", "_ => 0, 0", "ArrowFunctionExpression", 1),
@@ -1112,6 +1230,8 @@ ruleTester.run("no-extra-parens", rule, {
         invalid("async function a() { await (+a); }", "async function a() { await +a; }", "UnaryExpression", null),
         invalid("async function a() { +(await a); }", "async function a() { +await a; }", "AwaitExpression", null),
         invalid("async function a() { await ((a,b)); }", "async function a() { await (a,b); }", "SequenceExpression", null),
+        invalid("async function a() { a ** (await b); }", "async function a() { a ** await b; }", "AwaitExpression", null),
+
         invalid("(foo) instanceof bar", "foo instanceof bar", "Identifier", 1, { options: ["all", { nestedBinaryExpressions: false }] }),
         invalid("(foo) in bar", "foo in bar", "Identifier", 1, { options: ["all", { nestedBinaryExpressions: false }] }),
         invalid("(foo) + bar", "foo + bar", "Identifier", 1, { options: ["all", { nestedBinaryExpressions: false }] }),
@@ -1765,6 +1885,18 @@ ruleTester.run("no-extra-parens", rule, {
             1
         ),
         invalid(
+            "for (foo of (baz = bar));",
+            "for (foo of baz = bar);",
+            "AssignmentExpression",
+            1
+        ),
+        invalid(
+            "function* f() { for (foo of (yield bar)); }",
+            "function* f() { for (foo of yield bar); }",
+            "YieldExpression",
+            1
+        ),
+        invalid(
             "for (foo of ((bar, baz)));",
             "for (foo of (bar, baz));",
             "SequenceExpression",
@@ -1794,18 +1926,331 @@ ruleTester.run("no-extra-parens", rule, {
             "Identifier",
             1
         ),
+
+        // ForStatement#init expression cannot start with `let[`, but it can start with `let` if it isn't followed by `[`
         invalid(
-            "for ((let.foo) in bar);",
-            "for (let.foo in bar);",
+            "for ((let);;);",
+            "for (let;;);",
+            "Identifier",
+            1
+        ),
+        invalid(
+            "for ((let = 1);;);",
+            "for (let = 1;;);",
+            "AssignmentExpression",
+            1
+        ),
+        invalid(
+            "for ((let) = 1;;);",
+            "for (let = 1;;);",
+            "Identifier",
+            1
+        ),
+        invalid(
+            "for ((let = []);;);",
+            "for (let = [];;);",
+            "AssignmentExpression",
+            1
+        ),
+        invalid(
+            "for ((let) = [];;);",
+            "for (let = [];;);",
+            "Identifier",
+            1
+        ),
+        invalid(
+            "for ((let());;);",
+            "for (let();;);",
+            "CallExpression",
+            1
+        ),
+        invalid(
+            "for ((let([]));;);",
+            "for (let([]);;);",
+            "CallExpression",
+            1
+        ),
+        invalid(
+            "for ((let())[a];;);",
+            "for (let()[a];;);",
+            "CallExpression",
+            1
+        ),
+        invalid(
+            "for ((let`[]`);;);",
+            "for (let`[]`;;);",
+            "TaggedTemplateExpression",
+            1
+        ),
+        invalid(
+            "for ((let.a);;);",
+            "for (let.a;;);",
             "MemberExpression",
             1
         ),
         invalid(
-            "for ((let).foo.bar in baz);",
-            "for (let.foo.bar in baz);",
+            "for ((let).a;;);",
+            "for (let.a;;);",
             "Identifier",
             1
         ),
+        invalid(
+            "for ((let).a = 1;;);",
+            "for (let.a = 1;;);",
+            "Identifier",
+            1
+        ),
+        invalid(
+            "for ((let).a[b];;);",
+            "for (let.a[b];;);",
+            "Identifier",
+            1
+        ),
+        invalid(
+            "for ((let.a)[b];;);",
+            "for (let.a[b];;);",
+            "MemberExpression",
+            1
+        ),
+        invalid(
+            "for ((let.a[b]);;);",
+            "for (let.a[b];;);",
+            "MemberExpression",
+            1
+        ),
+        invalid(
+            "for ((let);[];);",
+            "for (let;[];);",
+            "Identifier",
+            1
+        ),
+        invalid(
+            "for (((let[a]));;);",
+            "for ((let[a]);;);",
+            "MemberExpression",
+            1
+        ),
+        invalid(
+            "for (((let))[a];;);",
+            "for ((let)[a];;);",
+            "Identifier",
+            1
+        ),
+        invalid(
+            "for (((let[a])).b;;);",
+            "for ((let[a]).b;;);",
+            "MemberExpression",
+            1
+        ),
+        invalid(
+            "for (((let))[a].b;;);",
+            "for ((let)[a].b;;);",
+            "Identifier",
+            1
+        ),
+        invalid(
+            "for (((let)[a]).b;;);",
+            "for ((let)[a].b;;);",
+            "MemberExpression",
+            1
+        ),
+        invalid(
+            "for (((let[a]) = b);;);",
+            "for ((let[a]) = b;;);",
+            "AssignmentExpression",
+            1
+        ),
+        invalid(
+            "for (((let)[a]) = b;;);",
+            "for ((let)[a] = b;;);",
+            "MemberExpression",
+            1
+        ),
+        invalid(
+            "for (((let)[a] = b);;);",
+            "for ((let)[a] = b;;);",
+            "AssignmentExpression",
+            1
+        ),
+        invalid(
+            "for ((Let[a]);;);",
+            "for (Let[a];;);",
+            "MemberExpression",
+            1
+        ),
+        invalid(
+            "for ((lett)[a];;);",
+            "for (lett[a];;);",
+            "Identifier",
+            1
+        ),
+
+        // ForInStatement#left expression cannot start with `let[`, but it can start with `let` if it isn't followed by `[`
+        invalid(
+            "for ((let) in foo);",
+            "for (let in foo);",
+            "Identifier",
+            1
+        ),
+        invalid(
+            "for ((let())[a] in foo);",
+            "for (let()[a] in foo);",
+            "CallExpression",
+            1
+        ),
+        invalid(
+            "for ((let.a) in foo);",
+            "for (let.a in foo);",
+            "MemberExpression",
+            1
+        ),
+        invalid(
+            "for ((let).a in foo);",
+            "for (let.a in foo);",
+            "Identifier",
+            1
+        ),
+        invalid(
+            "for ((let).a.b in foo);",
+            "for (let.a.b in foo);",
+            "Identifier",
+            1
+        ),
+        invalid(
+            "for ((let).a[b] in foo);",
+            "for (let.a[b] in foo);",
+            "Identifier",
+            1
+        ),
+        invalid(
+            "for ((let.a)[b] in foo);",
+            "for (let.a[b] in foo);",
+            "MemberExpression",
+            1
+        ),
+        invalid(
+            "for ((let.a[b]) in foo);",
+            "for (let.a[b] in foo);",
+            "MemberExpression",
+            1
+        ),
+        invalid(
+            "for (((let[a])) in foo);",
+            "for ((let[a]) in foo);",
+            "MemberExpression",
+            1
+        ),
+        invalid(
+            "for (((let))[a] in foo);",
+            "for ((let)[a] in foo);",
+            "Identifier",
+            1
+        ),
+        invalid(
+            "for (((let[a])).b in foo);",
+            "for ((let[a]).b in foo);",
+            "MemberExpression",
+            1
+        ),
+        invalid(
+            "for (((let))[a].b in foo);",
+            "for ((let)[a].b in foo);",
+            "Identifier",
+            1
+        ),
+        invalid(
+            "for (((let)[a]).b in foo);",
+            "for ((let)[a].b in foo);",
+            "MemberExpression",
+            1
+        ),
+        invalid(
+            "for (((let[a]).b) in foo);",
+            "for ((let[a]).b in foo);",
+            "MemberExpression",
+            1
+        ),
+        invalid(
+            "for ((Let[a]) in foo);",
+            "for (Let[a] in foo);",
+            "MemberExpression",
+            1
+        ),
+        invalid(
+            "for ((lett)[a] in foo);",
+            "for (lett[a] in foo);",
+            "Identifier",
+            1
+        ),
+
+        // ForOfStatement#left expression cannot start with `let`
+        invalid(
+            "for (((let)) of foo);",
+            "for ((let) of foo);",
+            "Identifier",
+            1
+        ),
+        invalid(
+            "for (((let)).a of foo);",
+            "for ((let).a of foo);",
+            "Identifier",
+            1
+        ),
+        invalid(
+            "for (((let))[a] of foo);",
+            "for ((let)[a] of foo);",
+            "Identifier",
+            1
+        ),
+        invalid(
+            "for (((let).a) of foo);",
+            "for ((let).a of foo);",
+            "MemberExpression",
+            1
+        ),
+        invalid(
+            "for (((let[a]).b) of foo);",
+            "for ((let[a]).b of foo);",
+            "MemberExpression",
+            1
+        ),
+        invalid(
+            "for (((let).a).b of foo);",
+            "for ((let).a.b of foo);",
+            "MemberExpression",
+            1
+        ),
+        invalid(
+            "for (((let).a.b) of foo);",
+            "for ((let).a.b of foo);",
+            "MemberExpression",
+            1
+        ),
+        invalid(
+            "for (((let.a).b) of foo);",
+            "for ((let.a).b of foo);",
+            "MemberExpression",
+            1
+        ),
+        invalid(
+            "for (((let()).a) of foo);",
+            "for ((let()).a of foo);",
+            "MemberExpression",
+            1
+        ),
+        invalid(
+            "for ((Let) of foo);",
+            "for (Let of foo);",
+            "Identifier",
+            1
+        ),
+        invalid(
+            "for ((lett) of foo);",
+            "for (lett of foo);",
+            "Identifier",
+            1
+        ),
+
         invalid("for (a in (b, c));", "for (a in b, c);", "SequenceExpression", null),
         invalid(
             "(let)",
@@ -2696,6 +3141,34 @@ ruleTester.run("no-extra-parens", rule, {
         {
             code: "var v = a | b ?? (c | d)",
             output: "var v = a | b ?? c | d",
+            parserOptions: { ecmaVersion: 2020 },
+            errors: [{ messageId: "unexpected" }]
+        },
+
+        // Optional chaining
+        {
+            code: "var v = (obj?.aaa)?.aaa",
+            output: "var v = obj?.aaa?.aaa",
+            parserOptions: { ecmaVersion: 2020 },
+            errors: [{ messageId: "unexpected" }]
+        },
+        {
+            code: "var v = (obj.aaa)?.aaa",
+            output: "var v = obj.aaa?.aaa",
+            parserOptions: { ecmaVersion: 2020 },
+            errors: [{ messageId: "unexpected" }]
+        },
+        {
+            code: "var foo = (function(){})?.call()",
+            output: "var foo = function(){}?.call()",
+            options: ["all", { enforceForFunctionPrototypeMethods: true }],
+            parserOptions: { ecmaVersion: 2020 },
+            errors: [{ messageId: "unexpected" }]
+        },
+        {
+            code: "var foo = (function(){}?.call())",
+            output: "var foo = function(){}?.call()",
+            options: ["all", { enforceForFunctionPrototypeMethods: true }],
             parserOptions: { ecmaVersion: 2020 },
             errors: [{ messageId: "unexpected" }]
         }

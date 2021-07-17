@@ -1,17 +1,17 @@
-# enforce consistent line breaks inside braces (object-curly-newline)
+# enforce consistent line breaks after opening and before closing braces (object-curly-newline)
 
 A number of style guides require or disallow line breaks inside of object braces and other tokens.
 
 ## Rule Details
 
-This rule enforces consistent line breaks inside braces of object literals or destructuring assignments.
+This rule requires or disallows a line break between `{` and its following token, and between `}` and its preceding token of object literals or destructuring assignments.
 
 ## Options
 
 This rule has either a string option:
 
-* `"always"` requires line breaks inside braces
-* `"never"` disallows line breaks inside braces
+* `"always"` requires line breaks after opening and before closing braces
+* `"never"` disallows line breaks after opening and before closing braces
 
 Or an object option:
 
@@ -335,19 +335,32 @@ let d = {
     foo: 1, bar: 2};
 let e = {foo: function() {
     dosomething();
-}};
+    }
+};
+let f = {
+    foo: function() {
+    dosomething();}};
 
-let {f
+let {g
 } = obj;
 let {
-    g} = obj;
-let {h, i
+    h} = obj;
+let {i, j
+} = obj;
+let {k, l
 } = obj;
 let {
-    j, k} = obj;
-let {l = function() {
+    m, n} = obj;
+let {
+    o, p} = obj;
+let {q = function() {
     dosomething();
-}} = obj;
+    }
+} = obj;
+let {
+    r = function() {
+        dosomething();
+    }} = obj;
 ```
 
 Examples of **correct** code for this rule with the default `{ "consistent": true }` option:
@@ -356,27 +369,35 @@ Examples of **correct** code for this rule with the default `{ "consistent": tru
 /*eslint object-curly-newline: ["error", { "consistent": true }]*/
 /*eslint-env es6*/
 
-let a = {};
-let b = {foo: 1};
-let c = {
+
+let empty1 = {};
+let empty2 = {
+};
+let a = {foo: 1};
+let b = {
     foo: 1
 };
-let d = {
+let c = {
     foo: 1, bar: 2
 };
-let e = {
+let d = {
     foo: 1,
     bar: 2
 };
-let f = {foo: function() {dosomething();}};
-let g = {
+let e = {foo: function() {dosomething();}};
+let f = {
     foo: function() {
         dosomething();
     }
 };
 
 let {} = obj;
-let {h} = obj;
+let {
+} = obj;
+let {g} = obj;
+let {
+    h
+} = obj;
 let {i, j} = obj;
 let {
     k, l
@@ -517,7 +538,7 @@ export { foo as f, bar } from 'foo-bar';
 
 ## When Not To Use It
 
-If you don't want to enforce consistent line breaks inside braces, then it's safe to disable this rule.
+If you don't want to enforce consistent line breaks after opening and before closing braces, then it's safe to disable this rule.
 
 ## Related Rules
 

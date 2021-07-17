@@ -82,7 +82,15 @@ describe("cli", () => {
     }
 
     // copy into clean area so as not to get "infected" by this project's .eslintrc files
-    before(() => {
+    before(function() {
+
+        /*
+         * GitHub Actions Windows and macOS runners occasionally exhibit
+         * extremely slow filesystem operations, during which copying fixtures
+         * exceeds the default test timeout, so raise it just for this hook.
+         * Mocha uses `this` to set timeouts on an individual hook level.
+         */
+        this.timeout(60 * 1000); // eslint-disable-line no-invalid-this
         fixtureDir = `${os.tmpdir()}/eslint/fixtures`;
         sh.mkdir("-p", fixtureDir);
         sh.cp("-r", "./tests/fixtures/.", fixtureDir);
@@ -768,6 +776,16 @@ describe("cli", () => {
             assert.strictEqual(exitCode, 1);
             assert.ok(log.error.calledOnce);
             assert.include(log.error.getCall(0).args[0], "ESLint found too many warnings");
+        });
+
+        it("should exit with exit code 1 without printing warnings if the quiet option is enabled and warning count exceeds threshold", async () => {
+            const filePath = getFixturePath("max-warnings");
+            const exitCode = await cli.execute(`--no-ignore --quiet --max-warnings 5 ${filePath}`);
+
+            assert.strictEqual(exitCode, 1);
+            assert.ok(log.error.calledOnce);
+            assert.include(log.error.getCall(0).args[0], "ESLint found too many warnings");
+            assert.ok(log.info.notCalled); // didn't print warnings
         });
 
         it("should not change exit code if warning count equals threshold", async () => {

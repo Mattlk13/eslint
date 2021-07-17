@@ -10,30 +10,24 @@ const os = require("os");
 const { assert } = require("chai");
 const sh = require("shelljs");
 const { CascadingConfigArrayFactory } =
-    require("../../../lib/cli-engine/cascading-config-array-factory");
-const { defineFileEnumeratorWithInMemoryFileSystem } = require("../../_utils");
+    require("@eslint/eslintrc/lib/cascading-config-array-factory");
+const { createCustomTeardown } = require("../../_utils");
+const { FileEnumerator } = require("../../../lib/cli-engine/file-enumerator");
 
 describe("FileEnumerator", () => {
     describe("'iterateFiles(patterns)' method should iterate files and configs.", () => {
         describe("with three directories ('lib', 'lib/nested', 'test') that contains 'one.js' and 'two.js'", () => {
             const root = path.join(os.tmpdir(), "eslint/file-enumerator");
             const files = {
-                /* eslint-disable quote-props */
-                "lib": {
-                    "nested": {
-                        "one.js": "",
-                        "two.js": "",
-                        "parser.js": "",
-                        ".eslintrc.yml": "parser: './parser'"
-                    },
-                    "one.js": "",
-                    "two.js": ""
-                },
-                "test": {
-                    "one.js": "",
-                    "two.js": "",
-                    ".eslintrc.yml": "env: { mocha: true }"
-                },
+                "lib/nested/one.js": "",
+                "lib/nested/two.js": "",
+                "lib/nested/parser.js": "",
+                "lib/nested/.eslintrc.yml": "parser: './parser'",
+                "lib/one.js": "",
+                "lib/two.js": "",
+                "test/one.js": "",
+                "test/two.js": "",
+                "test/.eslintrc.yml": "env: { mocha: true }",
                 ".eslintignore": "/lib/nested/parser.js",
                 ".eslintrc.json": JSON.stringify({
                     rules: {
@@ -41,16 +35,18 @@ describe("FileEnumerator", () => {
                         "no-unused-vars": "error"
                     }
                 })
-                /* eslint-enable quote-props */
             };
-            const { FileEnumerator } = defineFileEnumeratorWithInMemoryFileSystem({ cwd: () => root, files });
+            const { prepare, cleanup, getPath } = createCustomTeardown({ cwd: root, files });
 
             /** @type {FileEnumerator} */
             let enumerator;
 
-            beforeEach(() => {
-                enumerator = new FileEnumerator();
+            beforeEach(async () => {
+                await prepare();
+                enumerator = new FileEnumerator({ cwd: getPath() });
             });
+
+            afterEach(cleanup);
 
             it("should ignore empty strings.", () => {
                 Array.from(enumerator.iterateFiles(["lib/*.js", ""])); // don't throw "file not found" error.
@@ -177,7 +173,6 @@ describe("FileEnumerator", () => {
 
         // This group moved from 'tests/lib/util/glob-utils.js' when refactoring to keep the cumulated test cases.
         describe("with 'tests/fixtures/glob-utils' files", () => {
-            const { FileEnumerator } = require("../../../lib/cli-engine/file-enumerator");
             let fixtureDir;
 
             /**
@@ -211,7 +206,16 @@ describe("FileEnumerator", () => {
                 );
             }
 
-            before(() => {
+            before(function() {
+
+                /*
+                 * GitHub Actions Windows and macOS runners occasionally
+                 * exhibit extremely slow filesystem operations, during which
+                 * copying fixtures exceeds the default test timeout, so raise
+                 * it just for this hook. Mocha uses `this` to set timeouts on
+                 * an individual hook level.
+                 */
+                this.timeout(60 * 1000); // eslint-disable-line no-invalid-this
                 fixtureDir = `${os.tmpdir()}/eslint/tests/fixtures/`;
                 sh.mkdir("-p", fixtureDir);
                 sh.cp("-r", "./tests/fixtures/*", fixtureDir);
@@ -482,6 +486,77 @@ describe("FileEnumerator", () => {
                     assert.deepStrictEqual(result, [{ filename, ignored: false }]);
                 });
             });
+        });
+
+        describe("if contains symbolic links", async () => {
+            const root = path.join(os.tmpdir(), "eslint/file-enumerator");
+            const files = {
+                "dir1/1.js": "",
+                "dir1/2.js": "",
+                "top-level.js": "",
+                ".eslintrc.json": JSON.stringify({ rules: {} })
+            };
+            const dir2 = path.join(root, "dir2");
+            const { prepare, cleanup } = createCustomTeardown({ cwd: root, files });
+
+            beforeEach(async () => {
+                await prepare();
+                fs.mkdirSync(dir2);
+                fs.symlinkSync(path.join(root, "top-level.js"), path.join(dir2, "top.js"), "file");
+                fs.symlinkSync(path.join(root, "dir1"), path.join(dir2, "nested"), "dir");
+            });
+
+            afterEach(cleanup);
+
+            it("should resolve", () => {
+                const enumerator = new FileEnumerator({ cwd: root });
+                const list = Array.from(enumerator.iterateFiles(["dir2/**/*.js"])).map(({ filePath }) => filePath);
+
+                assert.deepStrictEqual(list, [
+                    path.join(dir2, "nested", "1.js"),
+                    path.join(dir2, "nested", "2.js"),
+                    path.join(dir2, "top.js")
+                ]);
+            });
+
+            it("should ignore broken links", () => {
+                fs.unlinkSync(path.join(root, "top-level.js"));
+
+                const enumerator = new FileEnumerator({ cwd: root });
+                const list = Array.from(enumerator.iterateFiles(["dir2/**/*.js"])).map(({ filePath }) => filePath);
+
+                assert.deepStrictEqual(list, [
+                    path.join(dir2, "nested", "1.js"),
+                    path.join(dir2, "nested", "2.js")
+                ]);
+            });
+        });
+    });
+
+    // https://github.com/eslint/eslint/issues/13789
+    describe("constructor default values when config extends eslint:recommended", () => {
+        const root = path.join(os.tmpdir(), "eslint/file-enumerator");
+        const files = {
+            "file.js": "",
+            ".eslintrc.json": JSON.stringify({
+                extends: ["eslint:recommended"]
+            })
+        };
+        const { prepare, cleanup, getPath } = createCustomTeardown({ cwd: root, files });
+
+
+        /** @type {FileEnumerator} */
+        let enumerator;
+
+        beforeEach(async () => {
+            await prepare();
+            enumerator = new FileEnumerator({ cwd: getPath() });
+        });
+
+        afterEach(cleanup);
+
+        it("should not throw an exception iterating files", () => {
+            Array.from(enumerator.iterateFiles(["."]));
         });
     });
 });

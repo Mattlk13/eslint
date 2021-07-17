@@ -71,22 +71,7 @@ module.exports = {
         "eslint-plugin/report-message-format": ["error", "[^a-z].*\\.$"],
         "eslint-plugin/require-meta-docs-description": "error",
         "eslint-plugin/require-meta-type": "error",
-        "eslint-plugin/test-case-property-ordering": [
-            "error",
-
-            // https://github.com/not-an-aardvark/eslint-plugin-eslint-plugin/issues/79
-            [
-                "filename",
-                "code",
-                "output",
-                "options",
-                "parser",
-                "parserOptions",
-                "globals",
-                "env",
-                "errors"
-            ]
-        ],
+        "eslint-plugin/test-case-property-ordering": "error",
         "eslint-plugin/test-case-shorthand-strings": "error",
         "internal-rules/multiline-comment-style": "error"
     },
@@ -95,12 +80,8 @@ module.exports = {
             files: ["lib/rules/*", "tools/internal-rules/*"],
             excludedFiles: ["index.js"],
             rules: {
-                "internal-rules/no-invalid-meta": "error"
-
-                /*
-                 * TODO: enable it when all the rules using meta.messages
-                 * "internal-rules/consistent-meta-messages": "error"
-                 */
+                "internal-rules/no-invalid-meta": "error",
+                "internal-rules/consistent-meta-messages": "error"
             }
         },
         {
