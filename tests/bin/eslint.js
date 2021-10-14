@@ -5,12 +5,24 @@
 
 "use strict";
 
+//-----------------------------------------------------------------------------
+// Requirements
+//-----------------------------------------------------------------------------
+
 const childProcess = require("child_process");
 const fs = require("fs");
 const assert = require("chai").assert;
 const path = require("path");
 
+//------------------------------------------------------------------------------
+// Data
+//------------------------------------------------------------------------------
+
 const EXECUTABLE_PATH = path.resolve(path.join(__dirname, "../../bin/eslint.js"));
+
+//-----------------------------------------------------------------------------
+// Helpers
+//-----------------------------------------------------------------------------
 
 /**
  * Returns a Promise for when a child process exits
@@ -25,7 +37,7 @@ function awaitExit(exitingProcess) {
  * Asserts that the exit code of a given child process will equal the given value.
  * @param {ChildProcess} exitingProcess The child process
  * @param {number} expectedExitCode The expected exit code of the child process
- * @returns {Promise} A Promise that fulfills if the exit code ends up matching, and rejects otherwise.
+ * @returns {Promise<void>} A Promise that fulfills if the exit code ends up matching, and rejects otherwise.
  */
 function assertExitCode(exitingProcess, expectedExitCode) {
     return awaitExit(exitingProcess).then(exitCode => {
@@ -47,6 +59,10 @@ function getOutput(runningProcess) {
     runningProcess.stderr.on("data", data => (stderr += data));
     return awaitExit(runningProcess).then(() => ({ stdout, stderr }));
 }
+
+//------------------------------------------------------------------------------
+// Tests
+//------------------------------------------------------------------------------
 
 describe("bin/eslint.js", () => {
     const forkedProcesses = new Set();
@@ -89,6 +105,7 @@ describe("bin/eslint.js", () => {
                     filePath: "<text>",
                     messages: [],
                     errorCount: 0,
+                    fatalErrorCount: 0,
                     warningCount: 0,
                     fixableErrorCount: 0,
                     fixableWarningCount: 0,
@@ -115,6 +132,14 @@ describe("bin/eslint.js", () => {
             child.stdin.write("This is not valid JS syntax.\n");
             child.stdin.end();
             return assertExitCode(child, 1);
+        });
+
+        it("has exit code 2 if a syntax error is thrown when exit-on-fatal-error is true", () => {
+            const child = runESLint(["--stdin", "--no-eslintrc", "--exit-on-fatal-error"]);
+
+            child.stdin.write("This is not valid JS syntax.\n");
+            child.stdin.end();
+            return assertExitCode(child, 2);
         });
 
         it("has exit code 1 if a linting error occurs", () => {
@@ -179,8 +204,8 @@ describe("bin/eslint.js", () => {
 
     describe("running on files", () => {
         it("has exit code 0 if no linting errors occur", () => assertExitCode(runESLint(["bin/eslint.js"]), 0));
-        it("has exit code 0 if a linting warning is reported", () => assertExitCode(runESLint(["bin/eslint.js", "--env", "es2020", "--no-eslintrc", "--rule", "semi: [1, never]"]), 0));
-        it("has exit code 1 if a linting error is reported", () => assertExitCode(runESLint(["bin/eslint.js", "--env", "es2020", "--no-eslintrc", "--rule", "semi: [2, never]"]), 1));
+        it("has exit code 0 if a linting warning is reported", () => assertExitCode(runESLint(["bin/eslint.js", "--env", "es2021", "--no-eslintrc", "--rule", "semi: [1, never]"]), 0));
+        it("has exit code 1 if a linting error is reported", () => assertExitCode(runESLint(["bin/eslint.js", "--env", "es2021", "--no-eslintrc", "--rule", "semi: [2, never]"]), 1));
         it("has exit code 1 if a syntax error is thrown", () => assertExitCode(runESLint(["README.md"]), 1));
     });
 

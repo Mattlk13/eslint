@@ -13,6 +13,10 @@ const rule = require("../../../lib/rules/space-infix-ops"),
     { RuleTester } = require("../../../lib/rule-tester"),
     parser = require("../../fixtures/fixture-parser");
 
+//------------------------------------------------------------------------------
+// Tests
+//------------------------------------------------------------------------------
+
 const ruleTester = new RuleTester();
 
 ruleTester.run("space-infix-ops", rule, {
@@ -47,7 +51,19 @@ ruleTester.run("space-infix-ops", rule, {
         { code: "const foo = function(a: number = 0): Bar { };", parser: parser("type-annotations/function-expression-type-annotation"), parserOptions: { ecmaVersion: 6 } },
 
         // TypeScript Type Aliases
-        { code: "type Foo<T> = T;", parser: parser("typescript-parsers/type-alias"), parserOptions: { ecmaVersion: 6 } }
+        { code: "type Foo<T> = T;", parser: parser("typescript-parsers/type-alias"), parserOptions: { ecmaVersion: 6 } },
+
+        // Logical Assignments
+        { code: "a &&= b", parserOptions: { ecmaVersion: 2021 } },
+        { code: "a ||= b", parserOptions: { ecmaVersion: 2021 } },
+        { code: "a ??= b", parserOptions: { ecmaVersion: 2021 } },
+
+        // Class Fields
+        { code: "class C { a; }", parserOptions: { ecmaVersion: 2022 } },
+        { code: "class C { a = b; }", parserOptions: { ecmaVersion: 2022 } },
+        { code: "class C { 'a' = b; }", parserOptions: { ecmaVersion: 2022 } },
+        { code: "class C { [a] = b; }", parserOptions: { ecmaVersion: 2022 } },
+        { code: "class C { #a = b; }", parserOptions: { ecmaVersion: 2022 } }
     ],
     invalid: [
         {
@@ -157,15 +173,69 @@ ruleTester.run("space-infix-ops", rule, {
         },
         {
             code: "a?b:c",
-            output: "a ? b:c",
-            errors: [{
-                messageId: "missingSpace",
-                data: { operator: "?" },
-                type: "ConditionalExpression",
-                line: 1,
-                column: 2,
-                endColumn: 3
-            }]
+            output: "a ? b : c",
+            errors: [
+                {
+                    messageId: "missingSpace",
+                    data: { operator: "?" },
+                    type: "ConditionalExpression",
+                    line: 1,
+                    column: 2,
+                    endColumn: 3
+                },
+                {
+                    messageId: "missingSpace",
+                    data: { operator: ":" },
+                    type: "ConditionalExpression",
+                    line: 1,
+                    column: 4,
+                    endColumn: 5
+                }
+            ]
+        },
+        {
+            code: "a? b :c",
+            output: "a ? b : c",
+            errors: [
+                {
+                    messageId: "missingSpace",
+                    data: { operator: "?" },
+                    type: "ConditionalExpression",
+                    line: 1,
+                    column: 2,
+                    endColumn: 3
+                },
+                {
+                    messageId: "missingSpace",
+                    data: { operator: ":" },
+                    type: "ConditionalExpression",
+                    line: 1,
+                    column: 6,
+                    endColumn: 7
+                }
+            ]
+        },
+        {
+            code: "a ?b: c",
+            output: "a ? b : c",
+            errors: [
+                {
+                    messageId: "missingSpace",
+                    data: { operator: "?" },
+                    type: "ConditionalExpression",
+                    line: 1,
+                    column: 3,
+                    endColumn: 4
+                },
+                {
+                    messageId: "missingSpace",
+                    data: { operator: ":" },
+                    type: "ConditionalExpression",
+                    line: 1,
+                    column: 5,
+                    endColumn: 6
+                }
+            ]
         },
         {
             code: "a?b : c",
@@ -408,7 +478,6 @@ ruleTester.run("space-infix-ops", rule, {
         },
 
         // Type Annotations
-
         {
             code: "var a: Foo= b;",
             output: "var a: Foo = b;",
@@ -432,6 +501,80 @@ ruleTester.run("space-infix-ops", rule, {
                 line: 1,
                 column: 23,
                 type: "AssignmentPattern"
+            }]
+        },
+
+        // Logical Assignments
+        {
+            code: "a&&=b",
+            output: "a &&= b",
+            parserOptions: { ecmaVersion: 2021 },
+            errors: [{
+                messageId: "missingSpace",
+                data: { operator: "&&=" },
+                line: 1,
+                column: 2,
+                endLine: 1,
+                endColumn: 5,
+                type: "AssignmentExpression"
+            }]
+        },
+        {
+            code: "a ||=b",
+            output: "a ||= b",
+            parserOptions: { ecmaVersion: 2021 },
+            errors: [{
+                messageId: "missingSpace",
+                data: { operator: "||=" },
+                line: 1,
+                column: 3,
+                endLine: 1,
+                endColumn: 6,
+                type: "AssignmentExpression"
+            }]
+        },
+        {
+            code: "a??= b",
+            output: "a ??= b",
+            parserOptions: { ecmaVersion: 2021 },
+            errors: [{
+                messageId: "missingSpace",
+                data: { operator: "??=" },
+                line: 1,
+                column: 2,
+                endLine: 1,
+                endColumn: 5,
+                type: "AssignmentExpression"
+            }]
+        },
+
+        // Class Fields
+        {
+            code: "class C { a=b; }",
+            output: "class C { a = b; }",
+            parserOptions: { ecmaVersion: 2022 },
+            errors: [{
+                messageId: "missingSpace",
+                data: { operator: "=" },
+                line: 1,
+                column: 12,
+                endLine: 1,
+                endColumn: 13,
+                type: "PropertyDefinition"
+            }]
+        },
+        {
+            code: "class C { [a ]= b; }",
+            output: "class C { [a ] = b; }",
+            parserOptions: { ecmaVersion: 2022 },
+            errors: [{
+                messageId: "missingSpace",
+                data: { operator: "=" },
+                line: 1,
+                column: 15,
+                endLine: 1,
+                endColumn: 16,
+                type: "PropertyDefinition"
             }]
         }
     ]

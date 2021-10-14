@@ -1,6 +1,6 @@
 {
   "name": "eslint-config-eslint",
-  "version": "6.0.0",
+  "version": "7.0.0",
   "author": "Nicholas C. Zakas <nicholas+npm@nczconsulting.com>",
   "description": "Default ESLint configuration for ESLint projects.",
   "scripts": {
@@ -20,7 +20,8 @@
   "homepage": "https://eslint.org",
   "bugs": "https://github.com/eslint/eslint/issues/",
   "peerDependencies": {
-    "eslint-plugin-jsdoc": ">=22.1.0",
+    "eslint-plugin-eslint-comments": ">=3.2.0",
+    "eslint-plugin-jsdoc": ">=36.0.6",
     "eslint-plugin-node": ">=11.1.0"
   },
   "keywords": [
@@ -30,6 +31,6 @@
   ],
   "license": "MIT",
   "engines": {
-    "node": "^8.10.0 || ^10.13.0 || >=11.10.1"
+    "node": "^10.12.0 || >=12.0.0"
   }
 }

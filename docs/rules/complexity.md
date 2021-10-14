@@ -32,6 +32,11 @@ function a(x) {
         return 4; // 3rd path
     }
 }
+
+function b() {
+    foo ||= 1;
+    bar &&= 1;
+}
 ```
 
 Examples of **correct** code for a maximum of 2:
@@ -44,6 +49,39 @@ function a(x) {
         return x;
     } else {
         return 4;
+    }
+}
+
+function b() {
+    foo ||= 1;
+}
+```
+
+Class field initializers are implicit functions. Therefore, their complexity is calculated separately for each initializer, and it doesn't contribute to the complexity of the enclosing code.
+
+Examples of additional **incorrect** code for a maximum of 2:
+
+```js
+/*eslint complexity: ["error", 2]*/
+
+class C {
+    x = a || b || c; // this initializer has complexity = 3
+}
+```
+
+Examples of additional **correct** code for a maximum of 2:
+
+```js
+/*eslint complexity: ["error", 2]*/
+
+function foo() { // this function has complexity = 1
+    class C {
+        x = a + b; // this initializer has complexity = 1
+        y = c || d; // this initializer has complexity = 2
+        z = e && f; // this initializer has complexity = 2
+
+        static p = g || h; // this initializer has complexity = 2
+        static q = i ? j : k; // this initializer has complexity = 2
     }
 }
 ```

@@ -16,12 +16,13 @@ const { RuleTester } = require("../../../lib/rule-tester");
 // Tests
 //------------------------------------------------------------------------------
 
-const ruleTester = new RuleTester({ parserOptions: { ecmaVersion: 2015 } });
+const ruleTester = new RuleTester({ parserOptions: { ecmaVersion: 2022 } });
 
 ruleTester.run("prefer-regex-literals", rule, {
     valid: [
         "/abc/",
         "/abc/g",
+
 
         // considered as dynamic
         "new RegExp(pattern)",
@@ -41,6 +42,26 @@ ruleTester.run("prefer-regex-literals", rule, {
         "new RegExp(String.raw`a${''}c`);",
         "new RegExp('a' + 'b')",
         "RegExp(1)",
+        "new RegExp(/a/, 'u');",
+        "new RegExp(/a/);",
+        {
+            code: "new RegExp(/a/, flags);",
+            options: [{ disallowRedundantWrapping: true }]
+        },
+        {
+            code: "new RegExp(/a/, `u${flags}`);",
+            options: [{ disallowRedundantWrapping: true }]
+        },
+
+        // redundant wrapping is allowed
+        {
+            code: "new RegExp(/a/);",
+            options: [{}]
+        },
+        {
+            code: "new RegExp(/a/);",
+            options: [{ disallowRedundantWrapping: false }]
+        },
 
         // invalid number of arguments
         "new RegExp;",
@@ -52,6 +73,10 @@ ruleTester.run("prefer-regex-literals", rule, {
         "RegExp(`a`, `g`, `b`);",
         "new RegExp(String.raw`a`, String.raw`g`, String.raw`b`);",
         "RegExp(String.raw`a`, String.raw`g`, String.raw`b`);",
+        {
+            code: "new RegExp(/a/, 'u', 'foo');",
+            options: [{ disallowRedundantWrapping: true }]
+        },
 
         // not String.raw``
         "new RegExp(String`a`);",
@@ -99,6 +124,10 @@ ruleTester.run("prefer-regex-literals", rule, {
         {
             code: "new globalThis.RegExp('a');",
             env: { es2017: true }
+        },
+        {
+            code: "class C { #RegExp; foo() { globalThis.#RegExp('a'); } }",
+            env: { es2020: true }
         }
     ],
 
@@ -196,6 +225,33 @@ ruleTester.run("prefer-regex-literals", rule, {
             code: "globalThis.RegExp('a');",
             env: { es2020: true },
             errors: [{ messageId: "unexpectedRegExp", type: "CallExpression" }]
+        },
+
+        {
+            code: "new RegExp(/a/);",
+            options: [{ disallowRedundantWrapping: true }],
+            errors: [{ messageId: "unexpectedRedundantRegExp", type: "NewExpression", line: 1, column: 1 }]
+        },
+        {
+            code: "new RegExp(/a/, 'u');",
+            options: [{ disallowRedundantWrapping: true }],
+            errors: [{ messageId: "unexpectedRedundantRegExpWithFlags", type: "NewExpression", line: 1, column: 1 }]
+        },
+        {
+            code: "new RegExp(/a/, `u`);",
+            options: [{ disallowRedundantWrapping: true }],
+            errors: [{ messageId: "unexpectedRedundantRegExpWithFlags", type: "NewExpression", line: 1, column: 1 }]
+        },
+        {
+            code: "new RegExp('a');",
+            options: [{ disallowRedundantWrapping: true }],
+            errors: [{ messageId: "unexpectedRegExp", type: "NewExpression", line: 1, column: 1 }]
+        },
+
+        // Optional chaining
+        {
+            code: "new RegExp((String?.raw)`a`);",
+            errors: [{ messageId: "unexpectedRegExp" }]
         }
     ]
 });

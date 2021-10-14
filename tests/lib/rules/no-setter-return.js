@@ -39,7 +39,7 @@ function error(column, type = "ReturnStatement") {
 // Tests
 //------------------------------------------------------------------------------
 
-const ruleTester = new RuleTester({ parserOptions: { ecmaVersion: 2018 } });
+const ruleTester = new RuleTester({ parserOptions: { ecmaVersion: 2022 } });
 
 ruleTester.run("no-setter-return", rule, {
     valid: [
@@ -114,6 +114,7 @@ ruleTester.run("no-setter-return", rule, {
         "class A { static set(val) { return 1; } }",
         "({ set: set = function set(val) { return 1; } } = {})",
         "({ set: set = (val) => 1 } = {})",
+        "class C { set; foo() { return 1; } }",
 
         // not returning from the setter
         "({ set foo(val) { function foo(val) { return 1; } } })",
@@ -504,6 +505,18 @@ ruleTester.run("no-setter-return", rule, {
         },
         {
             code: "Object.defineProperty(foo, 'bar', { set: function(Object) { return 1; } })",
+            errors: [error()]
+        },
+
+        // Optional chaining
+        {
+            code: "Object?.defineProperty(foo, 'bar', { set(val) { return 1; } })",
+            parserOptions: { ecmaVersion: 2020 },
+            errors: [error()]
+        },
+        {
+            code: "(Object?.defineProperty)(foo, 'bar', { set(val) { return 1; } })",
+            parserOptions: { ecmaVersion: 2020 },
             errors: [error()]
         }
     ]

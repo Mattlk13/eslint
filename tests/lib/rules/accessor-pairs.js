@@ -335,6 +335,11 @@ ruleTester.run("accessor-pairs", rule, {
             options: [{ enforceForClassMembers: true }],
             parserOptions: { ecmaVersion: 6 }
         },
+        {
+            code: "class A { get #a() {} }",
+            options: [{ enforceForClassMembers: true }],
+            parserOptions: { ecmaVersion: 13 }
+        },
 
         // Explicitly disabled option
         {
@@ -1087,6 +1092,46 @@ ruleTester.run("accessor-pairs", rule, {
             code: "Object.create(null, {foo: {set: function(value) {}}});",
             errors: [{ message: "Getter is not present in property descriptor.", type: "ObjectExpression" }]
         },
+        {
+            code: "var o = {d: 1};\n Object?.defineProperty(o, 'c', \n{set: function(value) {\n val = value; \n} \n});",
+            parserOptions: { ecmaVersion: 2020 },
+            errors: [{ message: "Getter is not present in property descriptor.", type: "ObjectExpression" }]
+        },
+        {
+            code: "Reflect?.defineProperty(obj, 'foo', {set: function(value) {}});",
+            parserOptions: { ecmaVersion: 2020 },
+            errors: [{ message: "Getter is not present in property descriptor.", type: "ObjectExpression" }]
+        },
+        {
+            code: "Object?.defineProperties(obj, {foo: {set: function(value) {}}});",
+            parserOptions: { ecmaVersion: 2020 },
+            errors: [{ message: "Getter is not present in property descriptor.", type: "ObjectExpression" }]
+        },
+        {
+            code: "Object?.create(null, {foo: {set: function(value) {}}});",
+            parserOptions: { ecmaVersion: 2020 },
+            errors: [{ message: "Getter is not present in property descriptor.", type: "ObjectExpression" }]
+        },
+        {
+            code: "var o = {d: 1};\n (Object?.defineProperty)(o, 'c', \n{set: function(value) {\n val = value; \n} \n});",
+            parserOptions: { ecmaVersion: 2020 },
+            errors: [{ message: "Getter is not present in property descriptor.", type: "ObjectExpression" }]
+        },
+        {
+            code: "(Reflect?.defineProperty)(obj, 'foo', {set: function(value) {}});",
+            parserOptions: { ecmaVersion: 2020 },
+            errors: [{ message: "Getter is not present in property descriptor.", type: "ObjectExpression" }]
+        },
+        {
+            code: "(Object?.defineProperties)(obj, {foo: {set: function(value) {}}});",
+            parserOptions: { ecmaVersion: 2020 },
+            errors: [{ message: "Getter is not present in property descriptor.", type: "ObjectExpression" }]
+        },
+        {
+            code: "(Object?.create)(null, {foo: {set: function(value) {}}});",
+            parserOptions: { ecmaVersion: 2020 },
+            errors: [{ message: "Getter is not present in property descriptor.", type: "ObjectExpression" }]
+        },
 
         //------------------------------------------------------------------------------
         // Classes
@@ -1167,6 +1212,26 @@ ruleTester.run("accessor-pairs", rule, {
             parserOptions: { ecmaVersion: 6 },
             errors: [{ message: "Getter is not present for class static setter 'a'.", type: "MethodDefinition" }]
         },
+        {
+            code: "class A { set '#a'(foo) {} }",
+            parserOptions: { ecmaVersion: 13 },
+            errors: [{ message: "Getter is not present for class setter '#a'.", type: "MethodDefinition" }]
+        },
+        {
+            code: "class A { set #a(foo) {} }",
+            parserOptions: { ecmaVersion: 13 },
+            errors: [{ message: "Getter is not present for class private setter #a.", type: "MethodDefinition" }]
+        },
+        {
+            code: "class A { static set '#a'(foo) {} }",
+            parserOptions: { ecmaVersion: 13 },
+            errors: [{ message: "Getter is not present for class static setter '#a'.", type: "MethodDefinition" }]
+        },
+        {
+            code: "class A { static set #a(foo) {} }",
+            parserOptions: { ecmaVersion: 13 },
+            errors: [{ message: "Getter is not present for class static private setter #a.", type: "MethodDefinition" }]
+        },
 
         // Test that the accessor kind options do not affect each other
         {
@@ -1198,6 +1263,30 @@ ruleTester.run("accessor-pairs", rule, {
             options: [{ getWithoutSet: true, enforceForClassMembers: true }],
             parserOptions: { ecmaVersion: 6 },
             errors: [{ message: "Setter is not present for class getter 'a'.", type: "MethodDefinition" }]
+        },
+        {
+            code: "class A { get '#a'() {} };",
+            options: [{ setWithoutGet: false, getWithoutSet: true, enforceForClassMembers: true }],
+            parserOptions: { ecmaVersion: 13 },
+            errors: [{ message: "Setter is not present for class getter '#a'.", type: "MethodDefinition" }]
+        },
+        {
+            code: "class A { get #a() {} };",
+            options: [{ setWithoutGet: false, getWithoutSet: true, enforceForClassMembers: true }],
+            parserOptions: { ecmaVersion: 13 },
+            errors: [{ message: "Setter is not present for class private getter #a.", type: "MethodDefinition" }]
+        },
+        {
+            code: "class A { static get '#a'() {} };",
+            options: [{ setWithoutGet: false, getWithoutSet: true, enforceForClassMembers: true }],
+            parserOptions: { ecmaVersion: 13 },
+            errors: [{ message: "Setter is not present for class static getter '#a'.", type: "MethodDefinition" }]
+        },
+        {
+            code: "class A { static get #a() {} };",
+            options: [{ setWithoutGet: false, getWithoutSet: true, enforceForClassMembers: true }],
+            parserOptions: { ecmaVersion: 13 },
+            errors: [{ message: "Setter is not present for class static private getter #a.", type: "MethodDefinition" }]
         },
 
         // Various kinds of keys
@@ -1382,6 +1471,24 @@ ruleTester.run("accessor-pairs", rule, {
             errors: [
                 { message: "Setter is not present for class getter.", type: "MethodDefinition", column: 11 },
                 { message: "Getter is not present for class setter.", type: "MethodDefinition", column: 28 }
+            ]
+        },
+        {
+            code: "class A { get #a() {} set '#a'(foo) {} }",
+            options: [{ setWithoutGet: true, getWithoutSet: true, enforceForClassMembers: true }],
+            parserOptions: { ecmaVersion: 13 },
+            errors: [
+                { message: "Setter is not present for class private getter #a.", type: "MethodDefinition", column: 11 },
+                { message: "Getter is not present for class setter '#a'.", type: "MethodDefinition", column: 23 }
+            ]
+        },
+        {
+            code: "class A { get '#a'() {} set #a(foo) {} }",
+            options: [{ setWithoutGet: true, getWithoutSet: true, enforceForClassMembers: true }],
+            parserOptions: { ecmaVersion: 13 },
+            errors: [
+                { message: "Setter is not present for class getter '#a'.", type: "MethodDefinition", column: 11 },
+                { message: "Getter is not present for class private setter #a.", type: "MethodDefinition", column: 25 }
             ]
         },
 

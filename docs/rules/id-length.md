@@ -30,6 +30,9 @@ var myObj = { a: 1 };
 (a) => { a * a };
 class x { }
 class Foo { x() {} }
+class Foo { #x() {} }
+class Foo { x = 1 }
+class Foo { #x = 1 }
 function foo(...x) { }
 function foo([x]) { }
 var [x] = arr;
@@ -61,6 +64,9 @@ var myObj = { apple: 1 };
 function foo(num = 0) { }
 class MyClass { }
 class Foo { method() {} }
+class Foo { #method() {} }
+class Foo { field = 1 }
+class Foo { #field = 1 }
 function foo(...args) { }
 function foo([longName]) { }
 var { prop } = {};
@@ -82,6 +88,7 @@ This rule has an object option:
 * `"properties": always` (default) enforces identifier length convention for property names
 * `"properties": never` ignores identifier length convention for property names
 * `"exceptions"` allows an array of specified identifier names
+* `"exceptionPatterns"` array of strings representing regular expression patterns, allows identifiers that match any of the patterns.
 
 ### min
 
@@ -215,6 +222,29 @@ try {
 var [x] = arr;
 const { x } = foo;
 const { a: x } = foo;
+```
+
+### exceptionPatterns
+
+Examples of additional **correct** code for this rule with the `{ "exceptionPatterns": ["E|S", "[x-z]"] }` option:
+
+```js
+/*eslint id-length: ["error", { "exceptionPatterns": ["E|S", "[x-z]"] }]*/
+/*eslint-env es6*/
+
+var E = 5;
+function S() { return 42; }
+obj.x = document.body;
+var foo = function (x) { /* do stuff */ };
+try {
+    dangerousStuff();
+} catch (x) {
+    // ignore as many do
+}
+(y) => {return  y * y};
+var [E] = arr;
+const { y } = foo;
+const { a: z } = foo;
 ```
 
 ## Related Rules

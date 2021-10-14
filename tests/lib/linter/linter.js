@@ -6,36 +6,16 @@
 "use strict";
 
 //------------------------------------------------------------------------------
-// Helper
-//------------------------------------------------------------------------------
-
-/**
- * To make sure this works in both browsers and Node.js
- * @param {string} name Name of the module to require
- * @param {Object} windowName name of the window
- * @returns {Object} Required object
- * @private
- */
-function compatRequire(name, windowName) {
-    if (typeof window === "object") { // eslint-disable-line no-undef
-        return window[windowName || name]; // eslint-disable-line no-undef
-    }
-    if (typeof require === "function") {
-        return require(name);
-    }
-    throw new Error(`Cannot find object '${name}'.`);
-}
-
-//------------------------------------------------------------------------------
 // Requirements
 //------------------------------------------------------------------------------
 
 const assert = require("chai").assert,
     sinon = require("sinon"),
+    espree = require("espree"),
     esprima = require("esprima"),
     testParsers = require("../../fixtures/parsers/linter-test-parsers");
 
-const { Linter } = compatRequire("../../../lib/linter", "eslint");
+const { Linter } = require("../../../lib/linter");
 
 //------------------------------------------------------------------------------
 // Constants
@@ -74,7 +54,7 @@ const ESLINT_ENV = "eslint-env";
 describe("Linter", () => {
     const filename = "filename.js";
 
-    /** @type {InstanceType<import("../../../lib/linter/linter.js")["Linter"]>} */
+    /** @type {InstanceType<import("../../../lib/linter/linter.js").Linter>} */
     let linter;
 
     beforeEach(() => {
@@ -107,7 +87,7 @@ describe("Linter", () => {
 
             assert.throws(() => {
                 linter.verify(code, config, filename);
-            }, `Intentional error.\nOccurred while linting ${filename}:1`);
+            }, `Intentional error.\nOccurred while linting ${filename}:1\nRule: "checker"`);
         });
 
         it("does not call rule listeners with a `this` value", () => {
@@ -1580,6 +1560,22 @@ describe("Linter", () => {
             assert.strictEqual(messages[0].message, filename);
         });
 
+        it("has access to the physicalFilename", () => {
+            linter.defineRule(code, context => ({
+                Literal(node) {
+                    context.report(node, context.getPhysicalFilename());
+                }
+            }));
+
+            const config = { rules: {} };
+
+            config.rules[code] = 1;
+
+            const messages = linter.verify("0", config, filename);
+
+            assert.strictEqual(messages[0].message, filename);
+        });
+
         it("defaults filename to '<input>'", () => {
             linter.defineRule(code, context => ({
                 Literal(node) {
@@ -2978,6 +2974,23 @@ var a = "test2";
             assert.strictEqual(messages.length, 0);
         });
 
+        // https://github.com/eslint/eslint/issues/14652
+        it("should not report a violation", () => {
+            const codes = [
+                "/*eslint-env es6\n */ new Promise();",
+                "/*eslint-env browser,\nes6 */ window;Promise;",
+                "/*eslint-env\nbrowser,es6 */ window;Promise;"
+            ];
+            const config = { rules: { "no-undef": 1 } };
+
+            for (const code of codes) {
+                const messages = linter.verify(code, config, filename);
+
+                assert.strictEqual(messages.length, 0);
+            }
+
+        });
+
         it("should not report a violation", () => {
             const code = `/*${ESLINT_ENV} mocha,node */ require();describe();`;
 
@@ -3190,7 +3203,7 @@ var a = "test2";
             "eslint-enable eqeqeq",
             "eslint-env es6"
         ]) {
-            // eslint-disable-next-line no-loop-func
+            // eslint-disable-next-line no-loop-func -- No closures
             it(`should warn '/* ${directive} */' if 'noInlineConfig' was given.`, () => {
                 const messages = linter.verify(`/* ${directive} */`, { noInlineConfig: true });
 
@@ -3206,7 +3219,7 @@ var a = "test2";
             "eslint-disable-line eqeqeq",
             "eslint-disable-next-line eqeqeq"
         ]) {
-            // eslint-disable-next-line no-loop-func
+            // eslint-disable-next-line no-loop-func -- No closures
             it(`should warn '// ${directive}' if 'noInlineConfig' was given.`, () => {
                 const messages = linter.verify(`// ${directive}`, { noInlineConfig: true });
 
@@ -3287,6 +3300,10 @@ var a = "test2";
                         message: "Unused eslint-disable directive (no problems were reported).",
                         line: 1,
                         column: 1,
+                        fix: {
+                            range: [0, 20],
+                            text: " "
+                        },
                         severity: 2,
                         nodeType: null
                     }
@@ -3303,6 +3320,10 @@ var a = "test2";
                         message: "Unused eslint-disable directive (no problems were reported).",
                         line: 1,
                         column: 1,
+                        fix: {
+                            range: [0, 20],
+                            text: " "
+                        },
                         severity: 2,
                         nodeType: null
                     }
@@ -3319,6 +3340,10 @@ var a = "test2";
                         message: "Unused eslint-disable directive (no problems were reported).",
                         line: 1,
                         column: 1,
+                        fix: {
+                            range: [0, 20],
+                            text: " "
+                        },
                         severity: 1,
                         nodeType: null
                     }
@@ -3335,11 +3360,607 @@ var a = "test2";
                         message: "Unused eslint-disable directive (no problems were reported).",
                         line: 1,
                         column: 1,
+                        fix: {
+                            range: [0, 20],
+                            text: " "
+                        },
                         severity: 1,
                         nodeType: null
                     }
                 ]
             );
+        });
+
+        it("reports problems for partially unused eslint-disable comments (in config)", () => {
+            const code = "alert('test'); // eslint-disable-line no-alert, no-redeclare";
+            const config = {
+                reportUnusedDisableDirectives: true,
+                rules: {
+                    "no-alert": 1,
+                    "no-redeclare": 1
+                }
+            };
+
+            const messages = linter.verify(code, config, {
+                filename,
+                allowInlineConfig: true
+            });
+
+            assert.deepStrictEqual(
+                messages,
+                [
+                    {
+                        ruleId: null,
+                        message: "Unused eslint-disable directive (no problems were reported from 'no-redeclare').",
+                        line: 1,
+                        column: 16,
+                        fix: {
+                            range: [46, 60],
+                            text: ""
+                        },
+                        severity: 1,
+                        nodeType: null
+                    }
+                ]
+            );
+        });
+
+        describe("autofix", () => {
+            const alwaysReportsRule = {
+                create(context) {
+                    return {
+                        Program(node) {
+                            context.report({ message: "bad code", loc: node.loc.end });
+                        }
+                    };
+                }
+            };
+
+            const neverReportsRule = {
+                create() {
+                    return {};
+                }
+            };
+
+            const ruleCount = 3;
+            const usedRules = Array.from(
+                { length: ruleCount },
+                (_, index) => `used${index ? `-${index}` : ""}` // "used", "used-1", "used-2"
+            );
+            const unusedRules = usedRules.map(name => `un${name}`); // "unused", "unused-1", "unused-2"
+
+            const config = {
+                reportUnusedDisableDirectives: true,
+                rules: {
+                    ...Object.fromEntries(usedRules.map(name => [name, "error"])),
+                    ...Object.fromEntries(unusedRules.map(name => [name, "error"]))
+                }
+            };
+
+            beforeEach(() => {
+                linter.defineRules(Object.fromEntries(usedRules.map(name => [name, alwaysReportsRule])));
+                linter.defineRules(Object.fromEntries(unusedRules.map(name => [name, neverReportsRule])));
+            });
+
+            const tests = [
+
+                //-----------------------------------------------
+                // Removing the entire comment
+                //-----------------------------------------------
+
+                {
+                    code: "// eslint-disable-line unused",
+                    output: " "
+                },
+                {
+                    code: "foo// eslint-disable-line unused",
+                    output: "foo "
+                },
+                {
+                    code: "// eslint-disable-line ,unused,",
+                    output: " "
+                },
+                {
+                    code: "// eslint-disable-line unused-1, unused-2",
+                    output: " "
+                },
+                {
+                    code: "// eslint-disable-line ,unused-1,, unused-2,, -- comment",
+                    output: " "
+                },
+                {
+                    code: "// eslint-disable-next-line unused\n",
+                    output: " \n"
+                },
+                {
+                    code: "// eslint-disable-next-line unused\nfoo",
+                    output: " \nfoo"
+                },
+                {
+                    code: "/* eslint-disable \nunused\n*/",
+                    output: " "
+                },
+
+                //-----------------------------------------------
+                // Removing only individual rules
+                //-----------------------------------------------
+
+                // content before the first rule should not be changed
+                {
+                    code: "//eslint-disable-line unused, used",
+                    output: "//eslint-disable-line used"
+                },
+                {
+                    code: "// eslint-disable-line unused, used",
+                    output: "// eslint-disable-line used"
+                },
+                {
+                    code: "//  eslint-disable-line unused, used",
+                    output: "//  eslint-disable-line used"
+                },
+                {
+                    code: "/*\neslint-disable unused, used*/",
+                    output: "/*\neslint-disable used*/"
+                },
+                {
+                    code: "/*\n eslint-disable unused, used*/",
+                    output: "/*\n eslint-disable used*/"
+                },
+                {
+                    code: "/*\r\neslint-disable unused, used*/",
+                    output: "/*\r\neslint-disable used*/"
+                },
+                {
+                    code: "/*\u2028eslint-disable unused, used*/",
+                    output: "/*\u2028eslint-disable used*/"
+                },
+                {
+                    code: "/*\u00A0eslint-disable unused, used*/",
+                    output: "/*\u00A0eslint-disable used*/"
+                },
+                {
+                    code: "// eslint-disable-line  unused, used",
+                    output: "// eslint-disable-line  used"
+                },
+                {
+                    code: "/* eslint-disable\nunused, used*/",
+                    output: "/* eslint-disable\nused*/"
+                },
+                {
+                    code: "/* eslint-disable\n unused, used*/",
+                    output: "/* eslint-disable\n used*/"
+                },
+                {
+                    code: "/* eslint-disable\r\nunused, used*/",
+                    output: "/* eslint-disable\r\nused*/"
+                },
+                {
+                    code: "/* eslint-disable\u2028unused, used*/",
+                    output: "/* eslint-disable\u2028used*/"
+                },
+                {
+                    code: "/* eslint-disable\u00A0unused, used*/",
+                    output: "/* eslint-disable\u00A0used*/"
+                },
+
+                // when removing the first rule, the comma and all whitespace up to the next rule (or next lone comma) should also be removed
+                {
+                    code: "// eslint-disable-line unused,used",
+                    output: "// eslint-disable-line used"
+                },
+                {
+                    code: "// eslint-disable-line unused, used",
+                    output: "// eslint-disable-line used"
+                },
+                {
+                    code: "// eslint-disable-line unused , used",
+                    output: "// eslint-disable-line used"
+                },
+                {
+                    code: "// eslint-disable-line unused,  used",
+                    output: "// eslint-disable-line used"
+                },
+                {
+                    code: "// eslint-disable-line unused  ,used",
+                    output: "// eslint-disable-line used"
+                },
+                {
+                    code: "/* eslint-disable unused\n,\nused */",
+                    output: "/* eslint-disable used */"
+                },
+                {
+                    code: "/* eslint-disable unused \n \n,\n\n used */",
+                    output: "/* eslint-disable used */"
+                },
+                {
+                    code: "/* eslint-disable unused\u2028,\u2028used */",
+                    output: "/* eslint-disable used */"
+                },
+                {
+                    code: "// eslint-disable-line unused\u00A0,\u00A0used",
+                    output: "// eslint-disable-line used"
+                },
+                {
+                    code: "// eslint-disable-line unused,,used",
+                    output: "// eslint-disable-line ,used"
+                },
+                {
+                    code: "// eslint-disable-line unused, ,used",
+                    output: "// eslint-disable-line ,used"
+                },
+                {
+                    code: "// eslint-disable-line unused,, used",
+                    output: "// eslint-disable-line , used"
+                },
+                {
+                    code: "// eslint-disable-line unused,used ",
+                    output: "// eslint-disable-line used "
+                },
+                {
+                    code: "// eslint-disable-next-line unused,used\n",
+                    output: "// eslint-disable-next-line used\n"
+                },
+
+                // when removing a rule in the middle, one comma and all whitespace between commas should also be removed
+                {
+                    code: "// eslint-disable-line used-1,unused,used-2",
+                    output: "// eslint-disable-line used-1,used-2"
+                },
+                {
+                    code: "// eslint-disable-line used-1, unused,used-2",
+                    output: "// eslint-disable-line used-1,used-2"
+                },
+                {
+                    code: "// eslint-disable-line used-1,unused ,used-2",
+                    output: "// eslint-disable-line used-1,used-2"
+                },
+                {
+                    code: "// eslint-disable-line used-1,  unused  ,used-2",
+                    output: "// eslint-disable-line used-1,used-2"
+                },
+                {
+                    code: "/* eslint-disable used-1,\nunused\n,used-2 */",
+                    output: "/* eslint-disable used-1,used-2 */"
+                },
+                {
+                    code: "/* eslint-disable used-1,\n\n unused \n \n ,used-2 */",
+                    output: "/* eslint-disable used-1,used-2 */"
+                },
+                {
+                    code: "/* eslint-disable used-1,\u2028unused\u2028,used-2 */",
+                    output: "/* eslint-disable used-1,used-2 */"
+                },
+                {
+                    code: "// eslint-disable-line used-1,\u00A0unused\u00A0,used-2",
+                    output: "// eslint-disable-line used-1,used-2"
+                },
+
+                // when removing a rule in the middle, content around commas should not be changed
+                {
+                    code: "// eslint-disable-line used-1, unused ,used-2",
+                    output: "// eslint-disable-line used-1,used-2"
+                },
+                {
+                    code: "// eslint-disable-line used-1,unused, used-2",
+                    output: "// eslint-disable-line used-1, used-2"
+                },
+                {
+                    code: "// eslint-disable-line used-1 ,unused,used-2",
+                    output: "// eslint-disable-line used-1 ,used-2"
+                },
+                {
+                    code: "// eslint-disable-line used-1 ,unused, used-2",
+                    output: "// eslint-disable-line used-1 , used-2"
+                },
+                {
+                    code: "// eslint-disable-line used-1  , unused ,  used-2",
+                    output: "// eslint-disable-line used-1  ,  used-2"
+                },
+                {
+                    code: "/* eslint-disable used-1\n,unused,\nused-2 */",
+                    output: "/* eslint-disable used-1\n,\nused-2 */"
+                },
+                {
+                    code: "/* eslint-disable used-1\u2028,unused,\u2028used-2 */",
+                    output: "/* eslint-disable used-1\u2028,\u2028used-2 */"
+                },
+                {
+                    code: "// eslint-disable-line used-1\u00A0,unused,\u00A0used-2",
+                    output: "// eslint-disable-line used-1\u00A0,\u00A0used-2"
+                },
+                {
+                    code: "// eslint-disable-line , unused ,used",
+                    output: "// eslint-disable-line ,used"
+                },
+                {
+                    code: "/* eslint-disable\n, unused ,used */",
+                    output: "/* eslint-disable\n,used */"
+                },
+                {
+                    code: "/* eslint-disable used-1,\n,unused,used-2 */",
+                    output: "/* eslint-disable used-1,\n,used-2 */"
+                },
+                {
+                    code: "/* eslint-disable used-1,unused,\n,used-2 */",
+                    output: "/* eslint-disable used-1,\n,used-2 */"
+                },
+                {
+                    code: "/* eslint-disable used-1,\n,unused,\n,used-2 */",
+                    output: "/* eslint-disable used-1,\n,\n,used-2 */"
+                },
+                {
+                    code: "// eslint-disable-line used, unused,",
+                    output: "// eslint-disable-line used,"
+                },
+                {
+                    code: "// eslint-disable-next-line used, unused,\n",
+                    output: "// eslint-disable-next-line used,\n"
+                },
+                {
+                    code: "// eslint-disable-line used, unused, ",
+                    output: "// eslint-disable-line used, "
+                },
+                {
+                    code: "// eslint-disable-line used, unused, -- comment",
+                    output: "// eslint-disable-line used, -- comment"
+                },
+                {
+                    code: "/* eslint-disable used, unused,\n*/",
+                    output: "/* eslint-disable used,\n*/"
+                },
+
+                // when removing the last rule, the comma and all whitespace up to the previous rule (or previous lone comma) should also be removed
+                {
+                    code: "// eslint-disable-line used,unused",
+                    output: "// eslint-disable-line used"
+                },
+                {
+                    code: "// eslint-disable-line used, unused",
+                    output: "// eslint-disable-line used"
+                },
+                {
+                    code: "// eslint-disable-line used ,unused",
+                    output: "// eslint-disable-line used"
+                },
+                {
+                    code: "// eslint-disable-line used , unused",
+                    output: "// eslint-disable-line used"
+                },
+                {
+                    code: "// eslint-disable-line used,  unused",
+                    output: "// eslint-disable-line used"
+                },
+                {
+                    code: "// eslint-disable-line used  ,unused",
+                    output: "// eslint-disable-line used"
+                },
+                {
+                    code: "/* eslint-disable used\n,\nunused */",
+                    output: "/* eslint-disable used */"
+                },
+                {
+                    code: "/* eslint-disable used \n \n,\n\n unused */",
+                    output: "/* eslint-disable used */"
+                },
+                {
+                    code: "/* eslint-disable used\u2028,\u2028unused */",
+                    output: "/* eslint-disable used */"
+                },
+                {
+                    code: "// eslint-disable-line used\u00A0,\u00A0unused",
+                    output: "// eslint-disable-line used"
+                },
+                {
+                    code: "// eslint-disable-line used,,unused",
+                    output: "// eslint-disable-line used,"
+                },
+                {
+                    code: "// eslint-disable-line used, ,unused",
+                    output: "// eslint-disable-line used,"
+                },
+                {
+                    code: "/* eslint-disable used,\n,unused */",
+                    output: "/* eslint-disable used, */"
+                },
+                {
+                    code: "/* eslint-disable used\n, ,unused */",
+                    output: "/* eslint-disable used\n, */"
+                },
+
+                // content after the last rule should not be changed
+                {
+                    code: "// eslint-disable-line used,unused",
+                    output: "// eslint-disable-line used"
+                },
+                {
+                    code: "// eslint-disable-line used,unused ",
+                    output: "// eslint-disable-line used "
+                },
+                {
+                    code: "// eslint-disable-line used,unused  ",
+                    output: "// eslint-disable-line used  "
+                },
+                {
+                    code: "// eslint-disable-line used,unused -- comment",
+                    output: "// eslint-disable-line used -- comment"
+                },
+                {
+                    code: "// eslint-disable-next-line used,unused\n",
+                    output: "// eslint-disable-next-line used\n"
+                },
+                {
+                    code: "// eslint-disable-next-line used,unused \n",
+                    output: "// eslint-disable-next-line used \n"
+                },
+                {
+                    code: "/* eslint-disable used,unused\u2028*/",
+                    output: "/* eslint-disable used\u2028*/"
+                },
+                {
+                    code: "// eslint-disable-line used,unused\u00A0",
+                    output: "// eslint-disable-line used\u00A0"
+                },
+
+                // multiply rules to remove
+                {
+                    code: "// eslint-disable-line used, unused-1, unused-2",
+                    output: "// eslint-disable-line used"
+                },
+                {
+                    code: "// eslint-disable-line unused-1, used, unused-2",
+                    output: "// eslint-disable-line used"
+                },
+                {
+                    code: "// eslint-disable-line unused-1, unused-2, used",
+                    output: "// eslint-disable-line used"
+                },
+                {
+                    code: "// eslint-disable-line used-1, unused-1, used-2, unused-2",
+                    output: "// eslint-disable-line used-1, used-2"
+                },
+                {
+                    code: "// eslint-disable-line unused-1, used-1, unused-2, used-2",
+                    output: "// eslint-disable-line used-1, used-2"
+                },
+                {
+                    code: `
+                        /* eslint-disable unused-1,
+                           used-1,
+                           unused-2,
+                           used-2
+                        */
+                    `,
+                    output: `
+                        /* eslint-disable used-1,
+                           used-2
+                        */
+                    `
+                },
+                {
+                    code: `
+                        /* eslint-disable
+                               unused-1,
+                               used-1,
+                               unused-2,
+                               used-2
+                        */
+                    `,
+                    output: `
+                        /* eslint-disable
+                               used-1,
+                               used-2
+                        */
+                    `
+                },
+                {
+                    code: `
+                        /* eslint-disable
+                               used-1,
+                               unused-1,
+                               used-2,
+                               unused-2
+                        */
+                    `,
+                    output: `
+                        /* eslint-disable
+                               used-1,
+                               used-2
+                        */
+                    `
+                },
+                {
+                    code: `
+                        /* eslint-disable
+                               used-1,
+                               unused-1,
+                               used-2,
+                               unused-2,
+                        */
+                    `,
+                    output: `
+                        /* eslint-disable
+                               used-1,
+                               used-2,
+                        */
+                    `
+                },
+                {
+                    code: `
+                        /* eslint-disable
+                               ,unused-1
+                               ,used-1
+                               ,unused-2
+                               ,used-2
+                        */
+                    `,
+                    output: `
+                        /* eslint-disable
+                               ,used-1
+                               ,used-2
+                        */
+                    `
+                },
+                {
+                    code: `
+                        /* eslint-disable
+                               ,used-1
+                               ,unused-1
+                               ,used-2
+                               ,unused-2
+                        */
+                    `,
+                    output: `
+                        /* eslint-disable
+                               ,used-1
+                               ,used-2
+                        */
+                    `
+                },
+                {
+                    code: `
+                        /* eslint-disable
+                               used-1,
+                               unused-1,
+                               used-2,
+                               unused-2
+
+                               -- comment
+                        */
+                    `,
+                    output: `
+                        /* eslint-disable
+                               used-1,
+                               used-2
+
+                               -- comment
+                        */
+                    `
+                },
+
+                // duplicates in the list
+                {
+                    code: "// eslint-disable-line unused, unused, used",
+                    output: "// eslint-disable-line used"
+                },
+                {
+                    code: "// eslint-disable-line unused, used, unused",
+                    output: "// eslint-disable-line used"
+                },
+                {
+                    code: "// eslint-disable-line used, unused, unused, used",
+                    output: "// eslint-disable-line used, used"
+                }
+            ];
+
+            for (const { code, output } of tests) {
+                // eslint-disable-next-line no-loop-func -- `linter` is getting updated in beforeEach()
+                it(code, () => {
+                    assert.strictEqual(
+                        linter.verifyAndFix(code, config).output,
+                        output
+                    );
+                });
+            }
         });
     });
 
@@ -3390,7 +4011,6 @@ var a = "test2";
                 });
 
                 linter.defineRule("checker", filenameChecker);
-                linter.defineRule("checker", filenameChecker);
                 linter.verify("foo;", { rules: { checker: "error" } }, { filename: "foo.js" });
                 assert(filenameChecker.calledOnce);
             });
@@ -3429,6 +4049,41 @@ var a = "test2";
             });
         });
 
+        describe("physicalFilenames", () => {
+            it("should be same as `filename` passed on options object, if no processors are used", () => {
+                const physicalFilenameChecker = sinon.spy(context => {
+                    assert.strictEqual(context.getPhysicalFilename(), "foo.js");
+                    return {};
+                });
+
+                linter.defineRule("checker", physicalFilenameChecker);
+                linter.verify("foo;", { rules: { checker: "error" } }, { filename: "foo.js" });
+                assert(physicalFilenameChecker.calledOnce);
+            });
+
+            it("should default physicalFilename to <input> when options object doesn't have filename", () => {
+                const physicalFilenameChecker = sinon.spy(context => {
+                    assert.strictEqual(context.getPhysicalFilename(), "<input>");
+                    return {};
+                });
+
+                linter.defineRule("checker", physicalFilenameChecker);
+                linter.verify("foo;", { rules: { checker: "error" } }, {});
+                assert(physicalFilenameChecker.calledOnce);
+            });
+
+            it("should default physicalFilename to <input> when only two arguments are passed", () => {
+                const physicalFilenameChecker = sinon.spy(context => {
+                    assert.strictEqual(context.getPhysicalFilename(), "<input>");
+                    return {};
+                });
+
+                linter.defineRule("checker", physicalFilenameChecker);
+                linter.verify("foo;", { rules: { checker: "error" } });
+                assert(physicalFilenameChecker.calledOnce);
+            });
+        });
+
         it("should report warnings in order by line and column when called", () => {
 
             const code = "foo()\n    alert('test')";
@@ -3446,6 +4101,57 @@ var a = "test2";
         });
 
         describe("ecmaVersion", () => {
+
+            it("should not support ES6 when no ecmaVersion provided", () => {
+                const messages = linter.verify("let x = 0;");
+
+                assert.strictEqual(messages.length, 1);
+            });
+
+            it("supports ECMAScript version 'latest'", () => {
+                const messages = linter.verify("let x = 5 ** 7;", {
+                    parserOptions: { ecmaVersion: "latest" }
+                });
+
+                assert.strictEqual(messages.length, 0);
+            });
+
+            it("the 'latest' is equal to espree.lastEcmaVersion", () => {
+                let ecmaVersion = null;
+                const config = { rules: { "ecma-version": 2 }, parserOptions: { ecmaVersion: "latest" } };
+
+                linter.defineRule("ecma-version", context => ({
+                    Program() {
+                        ecmaVersion = context.parserOptions.ecmaVersion;
+                    }
+                }));
+                linter.verify("", config);
+                assert.strictEqual(ecmaVersion, espree.latestEcmaVersion);
+            });
+
+            it("should pass normalized ecmaVersion to eslint-scope", () => {
+                let blockScope = null;
+
+                linter.defineRule("block-scope", context => ({
+                    BlockStatement() {
+                        blockScope = context.getScope();
+                    }
+                }));
+
+                linter.verify("{}", {
+                    rules: { "block-scope": 2 },
+                    parserOptions: { ecmaVersion: "latest" }
+                });
+
+                assert.strictEqual(blockScope.type, "block");
+
+                linter.verify("{}", {
+                    rules: { "block-scope": 2 },
+                    parserOptions: {} // ecmaVersion defaults to 5
+                });
+                assert.strictEqual(blockScope.type, "global");
+            });
+
             describe("it should properly parse let declaration when", () => {
                 it("the ECMAScript version number is 6", () => {
                     const messages = linter.verify("let x = 5;", {
@@ -4701,21 +5407,24 @@ var a = "test2";
 
     describe("suggestions", () => {
         it("provides suggestion information for tools to use", () => {
-            linter.defineRule("rule-with-suggestions", context => ({
-                Program(node) {
-                    context.report({
-                        node,
-                        message: "Incorrect spacing",
-                        suggest: [{
-                            desc: "Insert space at the beginning",
-                            fix: fixer => fixer.insertTextBefore(node, " ")
-                        }, {
-                            desc: "Insert space at the end",
-                            fix: fixer => fixer.insertTextAfter(node, " ")
-                        }]
-                    });
-                }
-            }));
+            linter.defineRule("rule-with-suggestions", {
+                meta: { hasSuggestions: true },
+                create: context => ({
+                    Program(node) {
+                        context.report({
+                            node,
+                            message: "Incorrect spacing",
+                            suggest: [{
+                                desc: "Insert space at the beginning",
+                                fix: fixer => fixer.insertTextBefore(node, " ")
+                            }, {
+                                desc: "Insert space at the end",
+                                fix: fixer => fixer.insertTextAfter(node, " ")
+                            }]
+                        });
+                    }
+                })
+            });
 
             const messages = linter.verify("var a = 1;", { rules: { "rule-with-suggestions": "error" } });
 
@@ -4740,7 +5449,8 @@ var a = "test2";
                     messages: {
                         suggestion1: "Insert space at the beginning",
                         suggestion2: "Insert space at the end"
-                    }
+                    },
+                    hasSuggestions: true
                 },
                 create: context => ({
                     Program(node) {
@@ -4777,6 +5487,44 @@ var a = "test2";
                 }
             }]);
         });
+
+        it("should throw an error if suggestion is passed but `meta.hasSuggestions` property is not enabled", () => {
+            linter.defineRule("rule-with-suggestions", {
+                meta: { docs: {}, schema: [] },
+                create: context => ({
+                    Program(node) {
+                        context.report({
+                            node,
+                            message: "hello world",
+                            suggest: [{ desc: "convert to foo", fix: fixer => fixer.insertTextBefore(node, " ") }]
+                        });
+                    }
+                })
+            });
+
+            assert.throws(() => {
+                linter.verify("0", { rules: { "rule-with-suggestions": "error" } });
+            }, "Rules with suggestions must set the `meta.hasSuggestions` property to `true`.");
+        });
+
+        it("should throw an error if suggestion is passed but `meta.hasSuggestions` property is not enabled and the rule has the obsolete `meta.docs.suggestion` property", () => {
+            linter.defineRule("rule-with-meta-docs-suggestion", {
+                meta: { docs: { suggestion: true }, schema: [] },
+                create: context => ({
+                    Program(node) {
+                        context.report({
+                            node,
+                            message: "hello world",
+                            suggest: [{ desc: "convert to foo", fix: fixer => fixer.insertTextBefore(node, " ") }]
+                        });
+                    }
+                })
+            });
+
+            assert.throws(() => {
+                linter.verify("0", { rules: { "rule-with-meta-docs-suggestion": "error" } });
+            }, "Rules with suggestions must set the `meta.hasSuggestions` property to `true`. `meta.docs.suggestion` is ignored by ESLint.");
+        });
     });
 
     describe("mutability", () => {
@@ -4804,14 +5552,17 @@ var a = "test2";
 
     describe("processors", () => {
         let receivedFilenames = [];
+        let receivedPhysicalFilenames = [];
 
         beforeEach(() => {
             receivedFilenames = [];
+            receivedPhysicalFilenames = [];
 
             // A rule that always reports the AST with a message equal to the source text
             linter.defineRule("report-original-text", context => ({
                 Program(ast) {
                     receivedFilenames.push(context.getFilename());
+                    receivedPhysicalFilenames.push(context.getPhysicalFilename());
                     context.report({ node: ast, message: context.getSourceCode().text });
                 }
             }));
@@ -4866,10 +5617,16 @@ var a = "test2";
 
                 assert.strictEqual(problems.length, 3);
                 assert.deepStrictEqual(problems.map(problem => problem.message), ["foo", "bar", "baz"]);
+
+                // filename
                 assert.strictEqual(receivedFilenames.length, 3);
                 assert(/^filename\.js[/\\]0_block\.js/u.test(receivedFilenames[0]));
                 assert(/^filename\.js[/\\]1_block\.js/u.test(receivedFilenames[1]));
                 assert(/^filename\.js[/\\]2_block\.js/u.test(receivedFilenames[2]));
+
+                // physical filename
+                assert.strictEqual(receivedPhysicalFilenames.length, 3);
+                assert.strictEqual(receivedPhysicalFilenames.every(name => name === filename), true);
             });
 
             it("should receive text even if a SourceCode object was given.", () => {
@@ -4955,17 +5712,24 @@ var a = "test2";
             it("should use postprocessed problem ranges when applying autofixes", () => {
                 const code = "foo bar baz";
 
-                linter.defineRule("capitalize-identifiers", context => ({
-                    Identifier(node) {
-                        if (node.name !== node.name.toUpperCase()) {
-                            context.report({
-                                node,
-                                message: "Capitalize this identifier",
-                                fix: fixer => fixer.replaceText(node, node.name.toUpperCase())
-                            });
-                        }
+                linter.defineRule("capitalize-identifiers", {
+                    meta: {
+                        fixable: "code"
+                    },
+                    create(context) {
+                        return {
+                            Identifier(node) {
+                                if (node.name !== node.name.toUpperCase()) {
+                                    context.report({
+                                        node,
+                                        message: "Capitalize this identifier",
+                                        fix: fixer => fixer.replaceText(node, node.name.toUpperCase())
+                                    });
+                                }
+                            }
+                        };
                     }
-                }));
+                });
 
                 const fixResult = linter.verifyAndFix(
                     code,
@@ -5054,15 +5818,23 @@ var a = "test2";
         });
 
         it("stops fixing after 10 passes", () => {
-            linter.defineRule("add-spaces", context => ({
-                Program(node) {
-                    context.report({
-                        node,
-                        message: "Add a space before this node.",
-                        fix: fixer => fixer.insertTextBefore(node, " ")
-                    });
+
+            linter.defineRule("add-spaces", {
+                meta: {
+                    fixable: "whitespace"
+                },
+                create(context) {
+                    return {
+                        Program(node) {
+                            context.report({
+                                node,
+                                message: "Add a space before this node.",
+                                fix: fixer => fixer.insertTextBefore(node, " ")
+                            });
+                        }
+                    };
                 }
-            }));
+            });
 
             const fixResult = linter.verifyAndFix("a", { rules: { "add-spaces": "error" } });
 
@@ -5086,10 +5858,10 @@ var a = "test2";
 
             assert.throws(() => {
                 linter.verify("0", { rules: { "test-rule": "error" } });
-            }, /Fixable rules should export a `meta\.fixable` property.\nOccurred while linting <input>:1$/u);
+            }, /Fixable rules must set the `meta\.fixable` property to "code" or "whitespace".\nOccurred while linting <input>:1\nRule: "test-rule"$/u);
         });
 
-        it("should not throw an error if fix is passed and there is no metadata", () => {
+        it("should throw an error if fix is passed and there is no metadata", () => {
             linter.defineRule("test-rule", {
                 create: context => ({
                     Program(node) {
@@ -5098,7 +5870,21 @@ var a = "test2";
                 })
             });
 
-            linter.verify("0", { rules: { "test-rule": "error" } });
+            assert.throws(() => {
+                linter.verify("0", { rules: { "test-rule": "error" } });
+            }, /Fixable rules must set the `meta\.fixable` property/u);
+        });
+
+        it("should throw an error if fix is passed from a legacy-format rule", () => {
+            linter.defineRule("test-rule", context => ({
+                Program(node) {
+                    context.report(node, "hello world", {}, () => ({ range: [1, 1], text: "" }));
+                }
+            }));
+
+            assert.throws(() => {
+                linter.verify("0", { rules: { "test-rule": "error" } });
+            }, /Fixable rules must set the `meta\.fixable` property/u);
         });
     });
 
@@ -5293,9 +6079,11 @@ var a = "test2";
             let types = [];
             let sourceCode;
             let scopeManager;
+            let firstChildNodes = [];
 
             beforeEach(() => {
                 types = [];
+                firstChildNodes = [];
                 linter.defineRule("collect-node-types", () => ({
                     "*"(node) {
                         types.push(node.type);
@@ -5306,12 +6094,18 @@ var a = "test2";
 
                     return {};
                 });
+                linter.defineRule("esquery-option", () => ({
+                    ":first-child"(node) {
+                        firstChildNodes.push(node);
+                    }
+                }));
                 linter.defineParser("enhanced-parser2", testParsers.enhancedParser2);
                 linter.verify("@foo class A {}", {
                     parser: "enhanced-parser2",
                     rules: {
                         "collect-node-types": "error",
-                        "save-scope-manager": "error"
+                        "save-scope-manager": "error",
+                        "esquery-option": "error"
                     }
                 });
 
@@ -5327,7 +6121,7 @@ var a = "test2";
 
             it("eslint-scope should use the visitorKeys (so 'childVisitorKeys.ClassDeclaration' includes 'experimentalDecorators')", () => {
                 assert.deepStrictEqual(
-                    scopeManager.__options.childVisitorKeys.ClassDeclaration, // eslint-disable-line no-underscore-dangle
+                    scopeManager.__options.childVisitorKeys.ClassDeclaration, // eslint-disable-line no-underscore-dangle -- ScopeManager API
                     ["experimentalDecorators", "id", "superClass", "body"]
                 );
             });
@@ -5349,6 +6143,13 @@ var a = "test2";
                 assert.deepStrictEqual(
                     types2,
                     ["Program", "ClassDeclaration", "Decorator", "Identifier", "Identifier", "ClassBody"]
+                );
+            });
+
+            it("esquery should use the visitorKeys (so 'visitorKeys.ClassDeclaration' includes 'experimentalDecorators')", () => {
+                assert.deepStrictEqual(
+                    firstChildNodes,
+                    [sourceCode.ast.body[0], sourceCode.ast.body[0].experimentalDecorators[0]]
                 );
             });
         });
@@ -5396,6 +6197,27 @@ var a = "test2";
             linter.defineParser("throws-with-options", testParsers.throwsWithOptions);
             const messages = linter.verify(";", { parser: "throws-with-options" }, "filename");
 
+            assert.strictEqual(messages.length, 0);
+        });
+    });
+
+    describe("merging 'parserOptions'", () => {
+        it("should deeply merge 'parserOptions' from an environment with 'parserOptions' from the provided config", () => {
+            const code = "return <div/>";
+            const config = {
+                env: {
+                    node: true // ecmaFeatures: { globalReturn: true }
+                },
+                parserOptions: {
+                    ecmaFeatures: {
+                        jsx: true
+                    }
+                }
+            };
+
+            const messages = linter.verify(code, config);
+
+            // no parsing errors
             assert.strictEqual(messages.length, 0);
         });
     });

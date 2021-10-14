@@ -48,6 +48,8 @@ ruleTester.run("no-eval", rule, {
         "var obj = {}; obj.foo = function() { this.eval('foo'); }",
         { code: "class A { foo() { this.eval(); } }", parserOptions: { ecmaVersion: 6 } },
         { code: "class A { static foo() { this.eval(); } }", parserOptions: { ecmaVersion: 6 } },
+        { code: "class A { field = this.eval(); }", parserOptions: { ecmaVersion: 2022 } },
+        { code: "class A { field = () => this.eval(); }", parserOptions: { ecmaVersion: 2022 } },
 
         // Allows indirect eval
         { code: "(0, eval)('foo')", options: [{ allowIndirect: true }] },
@@ -67,7 +69,10 @@ ruleTester.run("no-eval", rule, {
         { code: "(0, globalThis['eval'])('foo')", options: [{ allowIndirect: true }], env: { es2020: true } },
         { code: "var EVAL = globalThis.eval; EVAL('foo')", options: [{ allowIndirect: true }] },
         { code: "function foo() { globalThis.eval('foo') }", options: [{ allowIndirect: true }], env: { es2020: true } },
-        { code: "globalThis.globalThis.eval('foo');", options: [{ allowIndirect: true }], env: { es2020: true } }
+        { code: "globalThis.globalThis.eval('foo');", options: [{ allowIndirect: true }], env: { es2020: true } },
+        { code: "eval?.('foo')", options: [{ allowIndirect: true }], parserOptions: { ecmaVersion: 2020 } },
+        { code: "window?.eval('foo')", options: [{ allowIndirect: true }], parserOptions: { ecmaVersion: 2020 }, env: { browser: true } },
+        { code: "(window?.eval)('foo')", options: [{ allowIndirect: true }], parserOptions: { ecmaVersion: 2020 }, env: { browser: true } }
     ],
 
     invalid: [
@@ -100,6 +105,33 @@ ruleTester.run("no-eval", rule, {
         { code: "globalThis.globalThis.eval('foo')", env: { es2020: true }, errors: [{ messageId: "unexpected", type: "CallExpression", column: 23, endColumn: 27 }] },
         { code: "globalThis.globalThis['eval']('foo')", env: { es2020: true }, errors: [{ messageId: "unexpected", type: "CallExpression", column: 23, endColumn: 29 }] },
         { code: "(0, globalThis.eval)('foo')", env: { es2020: true }, errors: [{ messageId: "unexpected", type: "MemberExpression", column: 16, endColumn: 20 }] },
-        { code: "(0, globalThis['eval'])('foo')", env: { es2020: true }, errors: [{ messageId: "unexpected", type: "MemberExpression", column: 16, endColumn: 22 }] }
+        { code: "(0, globalThis['eval'])('foo')", env: { es2020: true }, errors: [{ messageId: "unexpected", type: "MemberExpression", column: 16, endColumn: 22 }] },
+
+        // Optional chaining
+        {
+            code: "window?.eval('foo')",
+            parserOptions: { ecmaVersion: 2020 },
+            globals: { window: "readonly" },
+            errors: [{ messageId: "unexpected" }]
+        },
+        {
+            code: "(window?.eval)('foo')",
+            parserOptions: { ecmaVersion: 2020 },
+            globals: { window: "readonly" },
+            errors: [{ messageId: "unexpected" }]
+        },
+        {
+            code: "(window?.window).eval('foo')",
+            parserOptions: { ecmaVersion: 2020 },
+            globals: { window: "readonly" },
+            errors: [{ messageId: "unexpected" }]
+        },
+
+        // Class fields
+        {
+            code: "class C { [this.eval('foo')] }",
+            parserOptions: { ecmaVersion: 2022 },
+            errors: [{ messageId: "unexpected" }]
+        }
     ]
 });

@@ -379,6 +379,10 @@ ruleTester.run("keyword-spacing", rule, {
         { code: "<Foo onClick={class {}} />", parserOptions: { ecmaVersion: 6, ecmaFeatures: { jsx: true } } },
         { code: "<Foo onClick={ class{}} />", options: [NEITHER], parserOptions: { ecmaVersion: 6, ecmaFeatures: { jsx: true } } },
 
+        // private names
+        { code: "class C {\n#x;\nfoo() {\nfor (this.#x of bar){}}}", options: [{ before: false }], parserOptions: { ecmaVersion: 2022 } },
+        { code: "class C {\n#x;\nfoo() {\nfor (this.#x in bar){}}}", options: [{ before: false }], parserOptions: { ecmaVersion: 2022 } },
+
         //----------------------------------------------------------------------
         // const
         //----------------------------------------------------------------------
@@ -721,10 +725,16 @@ ruleTester.run("keyword-spacing", rule, {
         { code: "class A { a() {} get [b]() {} }", options: [override("get", BOTH)], parserOptions: { ecmaVersion: 6 } },
         { code: "({ get[b]() {} })", options: [override("get", NEITHER)], parserOptions: { ecmaVersion: 6 } },
         { code: "class A { a() {}get[b]() {} }", options: [override("get", NEITHER)], parserOptions: { ecmaVersion: 6 } },
+        { code: "class A { a; get #b() {} }", parserOptions: { ecmaVersion: 2022 } },
+        { code: "class A { a;get#b() {} }", options: [NEITHER], parserOptions: { ecmaVersion: 2022 } },
 
         // not conflict with `comma-spacing`
         { code: "({ a,get [b]() {} })", parserOptions: { ecmaVersion: 6 } },
         { code: "({ a, get[b]() {} })", options: [NEITHER], parserOptions: { ecmaVersion: 6 } },
+
+        // not conflict with `semi-spacing`
+        { code: "class A { ;get #b() {} }", parserOptions: { ecmaVersion: 2022 } },
+        { code: "class A { ; get#b() {} }", options: [NEITHER], parserOptions: { ecmaVersion: 2022 } },
 
         //----------------------------------------------------------------------
         // if
@@ -905,10 +915,16 @@ ruleTester.run("keyword-spacing", rule, {
         { code: "class A { a() {} set [b](value) {} }", options: [override("set", BOTH)], parserOptions: { ecmaVersion: 6 } },
         { code: "({ set[b](value) {} })", options: [override("set", NEITHER)], parserOptions: { ecmaVersion: 6 } },
         { code: "class A { a() {}set[b](value) {} }", options: [override("set", NEITHER)], parserOptions: { ecmaVersion: 6 } },
+        { code: "class A { a; set #b(value) {} }", parserOptions: { ecmaVersion: 2022 } },
+        { code: "class A { a;set#b(value) {} }", options: [NEITHER], parserOptions: { ecmaVersion: 2022 } },
 
         // not conflict with `comma-spacing`
         { code: "({ a,set [b](value) {} })", parserOptions: { ecmaVersion: 6 } },
         { code: "({ a, set[b](value) {} })", options: [NEITHER], parserOptions: { ecmaVersion: 6 } },
+
+        // not conflict with `semi-spacing`
+        { code: "class A { ;set #b(value) {} }", parserOptions: { ecmaVersion: 2022 } },
+        { code: "class A { ; set#b(value) {} }", options: [NEITHER], parserOptions: { ecmaVersion: 2022 } },
 
         //----------------------------------------------------------------------
         // static
@@ -918,6 +934,10 @@ ruleTester.run("keyword-spacing", rule, {
         { code: "class A { a() {}static[b]() {} }", options: [NEITHER], parserOptions: { ecmaVersion: 6 } },
         { code: "class A { a() {} static [b]() {} }", options: [override("static", BOTH)], parserOptions: { ecmaVersion: 6 } },
         { code: "class A { a() {}static[b]() {} }", options: [override("static", NEITHER)], parserOptions: { ecmaVersion: 6 } },
+        { code: "class A { a; static [b]; }", parserOptions: { ecmaVersion: 2022 } },
+        { code: "class A { a;static[b]; }", options: [NEITHER], parserOptions: { ecmaVersion: 2022 } },
+        { code: "class A { a; static #b; }", parserOptions: { ecmaVersion: 2022 } },
+        { code: "class A { a;static#b; }", options: [NEITHER], parserOptions: { ecmaVersion: 2022 } },
 
         // not conflict with `generator-star-spacing`
         { code: "class A { static* [a]() {} }", parserOptions: { ecmaVersion: 6 } },
@@ -1364,14 +1384,14 @@ ruleTester.run("keyword-spacing", rule, {
             code: "import *as a from \"foo\"",
             output: "import * as a from \"foo\"",
             parserOptions: { ecmaVersion: 6, sourceType: "module" },
-            errors: expectedBefore("as")
-        },
-        {
-            code: "import* as a from\"foo\"",
-            output: "import*as a from\"foo\"",
-            options: [NEITHER],
-            parserOptions: { ecmaVersion: 6, sourceType: "module" },
-            errors: unexpectedBefore("as")
+            errors: [{
+                messageId: "expectedBefore",
+                data: { value: "as" },
+                line: 1,
+                column: 9,
+                endLine: 1,
+                endColumn: 11
+            }]
         },
         {
             code: "import* as a from\"foo\"",
@@ -1380,27 +1400,26 @@ ruleTester.run("keyword-spacing", rule, {
             parserOptions: { ecmaVersion: 6, sourceType: "module" },
             errors: [{
                 messageId: "unexpectedBefore",
+                data: { value: "as" },
                 line: 1,
                 column: 8,
                 endLine: 1,
                 endColumn: 9
-            }
-            ]
+            }]
         },
         {
-            code: "import *as a from\"foo\"",
+            code: "import*   as a from\"foo\"",
             output: "import*as a from\"foo\"",
             options: [NEITHER],
             parserOptions: { ecmaVersion: 6, sourceType: "module" },
-            errors: [
-                {
-                    messageId: "unexpectedAfter",
-                    line: 1,
-                    column: 7,
-                    endLine: 1,
-                    endColumn: 8
-                }
-            ]
+            errors: [{
+                messageId: "unexpectedBefore",
+                data: { value: "as" },
+                line: 1,
+                column: 8,
+                endLine: 1,
+                endColumn: 11
+            }]
         },
         {
             code: "import*as a from\"foo\"",
@@ -2454,6 +2473,19 @@ ruleTester.run("keyword-spacing", rule, {
             parserOptions: { ecmaVersion: 6 },
             errors: unexpectedBeforeAndAfter("get")
         },
+        {
+            code: "class A { a;get#b() {} }",
+            output: "class A { a;get #b() {} }",
+            parserOptions: { ecmaVersion: 2022 },
+            errors: expectedAfter("get")
+        },
+        {
+            code: "class A { a; get #b() {} }",
+            output: "class A { a; get#b() {} }",
+            options: [NEITHER],
+            parserOptions: { ecmaVersion: 2022 },
+            errors: unexpectedAfter("get")
+        },
 
         //----------------------------------------------------------------------
         // if
@@ -2510,6 +2542,47 @@ ruleTester.run("keyword-spacing", rule, {
         // import
         //----------------------------------------------------------------------
 
+        {
+            code: "import* as a from \"foo\"",
+            output: "import * as a from \"foo\"",
+            parserOptions: { ecmaVersion: 6, sourceType: "module" },
+            errors: [{
+                messageId: "expectedAfter",
+                data: { value: "import" },
+                line: 1,
+                column: 1,
+                endLine: 1,
+                endColumn: 7
+            }]
+        },
+        {
+            code: "import *as a from\"foo\"",
+            output: "import*as a from\"foo\"",
+            options: [NEITHER],
+            parserOptions: { ecmaVersion: 6, sourceType: "module" },
+            errors: [{
+                messageId: "unexpectedAfter",
+                data: { value: "import" },
+                line: 1,
+                column: 7,
+                endLine: 1,
+                endColumn: 8
+            }]
+        },
+        {
+            code: "import   *as a from\"foo\"",
+            output: "import*as a from\"foo\"",
+            options: [NEITHER],
+            parserOptions: { ecmaVersion: 6, sourceType: "module" },
+            errors: [{
+                messageId: "unexpectedAfter",
+                data: { value: "import" },
+                line: 1,
+                column: 7,
+                endLine: 1,
+                endColumn: 10
+            }]
+        },
         {
             code: "{}import{a} from \"foo\"",
             output: "{} import {a} from \"foo\"",
@@ -2793,6 +2866,19 @@ ruleTester.run("keyword-spacing", rule, {
             parserOptions: { ecmaVersion: 6 },
             errors: unexpectedBeforeAndAfter("set")
         },
+        {
+            code: "class A { a;set#b(x) {} }",
+            output: "class A { a;set #b(x) {} }",
+            parserOptions: { ecmaVersion: 2022 },
+            errors: expectedAfter("set")
+        },
+        {
+            code: "class A { a; set #b(x) {} }",
+            output: "class A { a; set#b(x) {} }",
+            options: [NEITHER],
+            parserOptions: { ecmaVersion: 2022 },
+            errors: unexpectedAfter("set")
+        },
 
         //----------------------------------------------------------------------
         // static
@@ -2837,6 +2923,32 @@ ruleTester.run("keyword-spacing", rule, {
             options: [override("static", NEITHER)],
             parserOptions: { ecmaVersion: 6 },
             errors: unexpectedBeforeAndAfter("static")
+        },
+        {
+            code: "class A { a;static[b]; }",
+            output: "class A { a;static [b]; }",
+            parserOptions: { ecmaVersion: 2022 },
+            errors: expectedAfter("static")
+        },
+        {
+            code: "class A { a; static [b]; }",
+            output: "class A { a; static[b]; }",
+            options: [NEITHER],
+            parserOptions: { ecmaVersion: 2022 },
+            errors: unexpectedAfter("static")
+        },
+        {
+            code: "class A { a;static#b; }",
+            output: "class A { a;static #b; }",
+            parserOptions: { ecmaVersion: 2022 },
+            errors: expectedAfter("static")
+        },
+        {
+            code: "class A { a; static #b; }",
+            output: "class A { a; static#b; }",
+            options: [NEITHER],
+            parserOptions: { ecmaVersion: 2022 },
+            errors: unexpectedAfter("static")
         },
 
         //----------------------------------------------------------------------

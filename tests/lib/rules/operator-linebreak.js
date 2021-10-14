@@ -56,8 +56,96 @@ ruleTester.run("operator-linebreak", rule, {
         { code: "\n1 + 1", options: ["none"] },
         { code: "1 + 1\n", options: ["none"] },
         { code: "answer = everything ? 42 : foo;", options: ["none"] },
+        { code: "(a\n) + (\nb)", options: ["none"] },
         { code: "answer = everything \n?\n 42 : foo;", options: [null, { overrides: { "?": "ignore" } }] },
-        { code: "answer = everything ? 42 \n:\n foo;", options: [null, { overrides: { ":": "ignore" } }] }
+        { code: "answer = everything ? 42 \n:\n foo;", options: [null, { overrides: { ":": "ignore" } }] },
+
+        {
+            code: "a \n &&= b",
+            options: ["after", { overrides: { "&&=": "ignore" } }],
+            parserOptions: { ecmaVersion: 2021 }
+        },
+        {
+            code: "a ??= \n b",
+            options: ["before", { overrides: { "??=": "ignore" } }],
+            parserOptions: { ecmaVersion: 2021 }
+        },
+        {
+            code: "a ||= \n b",
+            options: ["after", { overrides: { "=": "before" } }],
+            parserOptions: { ecmaVersion: 2021 }
+        },
+        {
+            code: "a \n &&= b",
+            options: ["before", { overrides: { "&=": "after" } }],
+            parserOptions: { ecmaVersion: 2021 }
+        },
+        {
+            code: "a \n ||= b",
+            options: ["before", { overrides: { "|=": "after" } }],
+            parserOptions: { ecmaVersion: 2021 }
+        },
+        {
+            code: "a &&= \n b",
+            options: ["after", { overrides: { "&&": "before" } }],
+            parserOptions: { ecmaVersion: 2021 }
+        },
+        {
+            code: "a ||= \n b",
+            options: ["after", { overrides: { "||": "before" } }],
+            parserOptions: { ecmaVersion: 2021 }
+        },
+        {
+            code: "a ??= \n b",
+            options: ["after", { overrides: { "??": "before" } }],
+            parserOptions: { ecmaVersion: 2021 }
+        },
+
+        // class fields
+        {
+            code: "class C { foo =\n0 }",
+            parserOptions: { ecmaVersion: 2022 }
+        },
+        {
+            code: "class C { foo\n= 0 }",
+            options: ["before"],
+            parserOptions: { ecmaVersion: 2022 }
+        },
+        {
+            code: "class C { [foo\n]= 0 }",
+            options: ["before"],
+            parserOptions: { ecmaVersion: 2022 }
+        },
+        {
+            code: "class C { [foo]\n= 0 }",
+            options: ["before"],
+            parserOptions: { ecmaVersion: 2022 }
+        },
+        {
+            code: "class C { [foo\n]\n= 0 }",
+            options: ["before"],
+            parserOptions: { ecmaVersion: 2022 }
+        },
+        {
+            code: "class C { [foo\n]= 0 }",
+            options: ["after"],
+            parserOptions: { ecmaVersion: 2022 }
+        },
+        {
+            code: "class C { [foo\n]=\n0 }",
+            options: ["after"],
+            parserOptions: { ecmaVersion: 2022 }
+        },
+        {
+            code: "class C { [foo\n]= 0 }",
+            options: ["none"],
+            parserOptions: { ecmaVersion: 2022 }
+        },
+        {
+            code: "class C { foo\n=\n0 }",
+            options: ["none", { overrides: { "=": "ignore" } }],
+            parserOptions: { ecmaVersion: 2022 }
+        }
     ],
 
     invalid: [
@@ -637,6 +725,189 @@ ruleTester.run("operator-linebreak", rule, {
             errors: [{
                 messageId: "operatorAtBeginning",
                 data: { operator: "??" }
+            }]
+        },
+
+        {
+            code: "a \n  &&= b",
+            output: "a &&= \n  b",
+            options: ["after"],
+            parserOptions: { ecmaVersion: 2021 },
+            errors: [{
+                messageId: "operatorAtEnd",
+                data: { operator: "&&=" },
+                type: "AssignmentExpression",
+                line: 2,
+                column: 3,
+                endLine: 2,
+                endColumn: 6
+            }]
+        },
+        {
+            code: "a ||=\n b",
+            output: "a\n ||= b",
+            options: ["before"],
+            parserOptions: { ecmaVersion: 2021 },
+            errors: [{
+                messageId: "operatorAtBeginning",
+                data: { operator: "||=" },
+                type: "AssignmentExpression",
+                line: 1,
+                column: 3,
+                endLine: 1,
+                endColumn: 6
+            }]
+        },
+        {
+            code: "a  ??=\n b",
+            output: "a  ??= b",
+            options: ["none"],
+            parserOptions: { ecmaVersion: 2021 },
+            errors: [{
+                messageId: "noLinebreak",
+                data: { operator: "??=" },
+                type: "AssignmentExpression",
+                line: 1,
+                column: 4,
+                endLine: 1,
+                endColumn: 7
+            }]
+        },
+        {
+            code: "a \n  &&= b",
+            output: "a   &&= b",
+            options: ["before", { overrides: { "&&=": "none" } }],
+            parserOptions: { ecmaVersion: 2021 },
+            errors: [{
+                messageId: "noLinebreak",
+                data: { operator: "&&=" },
+                type: "AssignmentExpression",
+                line: 2,
+                column: 3,
+                endLine: 2,
+                endColumn: 6
+            }]
+        },
+        {
+            code: "a ||=\nb",
+            output: "a\n||= b",
+            options: ["after", { overrides: { "||=": "before" } }],
+            parserOptions: { ecmaVersion: 2021 },
+            errors: [{
+                messageId: "operatorAtBeginning",
+                data: { operator: "||=" },
+                type: "AssignmentExpression",
+                line: 1,
+                column: 3,
+                endLine: 1,
+                endColumn: 6
+            }]
+        },
+        {
+            code: "a\n??=b",
+            output: "a??=\nb",
+            options: ["none", { overrides: { "??=": "after" } }],
+            parserOptions: { ecmaVersion: 2021 },
+            errors: [{
+                messageId: "operatorAtEnd",
+                data: { operator: "??=" },
+                type: "AssignmentExpression",
+                line: 2,
+                column: 1,
+                endLine: 2,
+                endColumn: 4
+            }]
+        },
+
+        // class fields
+        {
+            code: "class C { a\n= 0; }",
+            output: "class C { a =\n0; }",
+            options: ["after"],
+            parserOptions: { ecmaVersion: 2022 },
+            errors: [{
+                messageId: "operatorAtEnd",
+                data: { operator: "=" },
+                type: "PropertyDefinition",
+                line: 2,
+                column: 1,
+                endLine: 2,
+                endColumn: 2
+            }]
+        },
+        {
+            code: "class C { a =\n0; }",
+            output: "class C { a\n= 0; }",
+            options: ["before"],
+            parserOptions: { ecmaVersion: 2022 },
+            errors: [{
+                messageId: "operatorAtBeginning",
+                data: { operator: "=" },
+                type: "PropertyDefinition",
+                line: 1,
+                column: 13,
+                endLine: 1,
+                endColumn: 14
+            }]
+        },
+        {
+            code: "class C { a =\n0; }",
+            output: "class C { a =0; }",
+            options: ["none"],
+            parserOptions: { ecmaVersion: 2022 },
+            errors: [{
+                messageId: "noLinebreak",
+                data: { operator: "=" },
+                type: "PropertyDefinition",
+                line: 1,
+                column: 13,
+                endLine: 1,
+                endColumn: 14
+            }]
+        },
+        {
+            code: "class C { [a]\n= 0; }",
+            output: "class C { [a] =\n0; }",
+            options: ["after"],
+            parserOptions: { ecmaVersion: 2022 },
+            errors: [{
+                messageId: "operatorAtEnd",
+                data: { operator: "=" },
+                type: "PropertyDefinition",
+                line: 2,
+                column: 1,
+                endLine: 2,
+                endColumn: 2
+            }]
+        },
+        {
+            code: "class C { [a] =\n0; }",
+            output: "class C { [a]\n= 0; }",
+            options: ["before"],
+            parserOptions: { ecmaVersion: 2022 },
+            errors: [{
+                messageId: "operatorAtBeginning",
+                data: { operator: "=" },
+                type: "PropertyDefinition",
+                line: 1,
+                column: 15,
+                endLine: 1,
+                endColumn: 16
+            }]
+        },
+        {
+            code: "class C { [a]\n =0; }",
+            output: "class C { [a] =0; }",
+            options: ["none"],
+            parserOptions: { ecmaVersion: 2022 },
+            errors: [{
+                messageId: "noLinebreak",
+                data: { operator: "=" },
+                type: "PropertyDefinition",
+                line: 2,
+                column: 2,
+                endLine: 2,
+                endColumn: 3
             }]
         }
     ]

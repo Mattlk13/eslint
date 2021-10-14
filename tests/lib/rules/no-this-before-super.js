@@ -16,7 +16,7 @@ const { RuleTester } = require("../../../lib/rule-tester");
 // Tests
 //------------------------------------------------------------------------------
 
-const ruleTester = new RuleTester({ parserOptions: { ecmaVersion: 6 } });
+const ruleTester = new RuleTester({ parserOptions: { ecmaVersion: 2022 } });
 
 ruleTester.run("no-this-before-super", rule, {
     valid: [
@@ -39,6 +39,10 @@ ruleTester.run("no-this-before-super", rule, {
         "class A extends B { constructor() { super(); this.c(); } }",
         "class A extends B { constructor() { super(); super.c(); } }",
         "class A extends B { constructor() { if (true) { super(); } else { super(); } this.c(); } }",
+        "class A extends B { constructor() { foo = super(); this.c(); } }",
+        "class A extends B { constructor() { foo += super().a; this.c(); } }",
+        "class A extends B { constructor() { foo |= super().a; this.c(); } }",
+        "class A extends B { constructor() { foo &= super().a; this.c(); } }",
 
         // allows `this`/`super` in nested executable scopes, even if before `super()`.
         "class A extends B { constructor() { class B extends C { constructor() { super(); this.d = 0; } } super(); } }",
@@ -93,7 +97,13 @@ ruleTester.run("no-this-before-super", rule, {
                     }
                 }
             }
-        `
+        `,
+
+        // Class field initializers are always evaluated after `super()`.
+        "class C { field = this.toString(); }",
+        "class C extends B { field = this.foo(); }",
+        "class C extends B { field = this.foo(); constructor() { super(); } }",
+        "class C extends B { field = this.foo(); constructor() { } }" // < in this case, initializers are never evaluated.
     ],
     invalid: [
 
@@ -160,6 +170,21 @@ ruleTester.run("no-this-before-super", rule, {
         },
         {
             code: "class A extends B { constructor() { try { super(); } catch (err) { } this.a; } }",
+            errors: [{ messageId: "noBeforeSuper", data: { kind: "this" }, type: "ThisExpression" }]
+        },
+        {
+            code: "class A extends B { constructor() { foo &&= super().a; this.c(); } }",
+            parserOptions: { ecmaVersion: 2021 },
+            errors: [{ messageId: "noBeforeSuper", data: { kind: "this" }, type: "ThisExpression" }]
+        },
+        {
+            code: "class A extends B { constructor() { foo ||= super().a; this.c(); } }",
+            parserOptions: { ecmaVersion: 2021 },
+            errors: [{ messageId: "noBeforeSuper", data: { kind: "this" }, type: "ThisExpression" }]
+        },
+        {
+            code: "class A extends B { constructor() { foo ??= super().a; this.c(); } }",
+            parserOptions: { ecmaVersion: 2021 },
             errors: [{ messageId: "noBeforeSuper", data: { kind: "this" }, type: "ThisExpression" }]
         }
     ]

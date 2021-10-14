@@ -82,7 +82,15 @@ describe("cli", () => {
     }
 
     // copy into clean area so as not to get "infected" by this project's .eslintrc files
-    before(() => {
+    before(function() {
+
+        /*
+         * GitHub Actions Windows and macOS runners occasionally exhibit
+         * extremely slow filesystem operations, during which copying fixtures
+         * exceeds the default test timeout, so raise it just for this hook.
+         * Mocha uses `this` to set timeouts on an individual hook level.
+         */
+        this.timeout(60 * 1000); // eslint-disable-line no-invalid-this -- Mocha API
         fixtureDir = `${os.tmpdir()}/eslint/fixtures`;
         sh.mkdir("-p", fixtureDir);
         sh.cp("-r", "./tests/fixtures/.", fixtureDir);
@@ -504,7 +512,7 @@ describe("cli", () => {
                 const exit = await cli.execute(code);
 
                 assert.strictEqual(exit, 2);
-            }, /Error while loading rule 'custom-rule': Cannot read property/u);
+            }, /Error while loading rule 'custom-rule': Boom!/u);
         });
 
         it("should return a warning when rule is matched", async () => {
@@ -770,6 +778,16 @@ describe("cli", () => {
             assert.include(log.error.getCall(0).args[0], "ESLint found too many warnings");
         });
 
+        it("should exit with exit code 1 without printing warnings if the quiet option is enabled and warning count exceeds threshold", async () => {
+            const filePath = getFixturePath("max-warnings");
+            const exitCode = await cli.execute(`--no-ignore --quiet --max-warnings 5 ${filePath}`);
+
+            assert.strictEqual(exitCode, 1);
+            assert.ok(log.error.calledOnce);
+            assert.include(log.error.getCall(0).args[0], "ESLint found too many warnings");
+            assert.ok(log.info.notCalled); // didn't print warnings
+        });
+
         it("should not change exit code if warning count equals threshold", async () => {
             const filePath = getFixturePath("max-warnings");
             const exitCode = await cli.execute(`--no-ignore --max-warnings 6 ${filePath}`);
@@ -783,6 +801,38 @@ describe("cli", () => {
 
             assert.strictEqual(exitCode, 0);
         });
+    });
+
+    describe("when given the exit-on-fatal-error flag", () => {
+        it("should not change exit code if no fatal errors are reported", async () => {
+            const filePath = getFixturePath("exit-on-fatal-error", "no-fatal-error.js");
+            const exitCode = await cli.execute(`--no-ignore --exit-on-fatal-error ${filePath}`);
+
+            assert.strictEqual(exitCode, 0);
+        });
+
+        it("should exit with exit code 1 if no fatal errors are found, but rule violations are found", async () => {
+            const filePath = getFixturePath("exit-on-fatal-error", "no-fatal-error-rule-violation.js");
+            const exitCode = await cli.execute(`--no-ignore --exit-on-fatal-error ${filePath}`);
+
+            assert.strictEqual(exitCode, 1);
+        });
+
+        it("should exit with exit code 2 if fatal error is found", async () => {
+            const filePath = getFixturePath("exit-on-fatal-error", "fatal-error.js");
+            const exitCode = await cli.execute(`--no-ignore --exit-on-fatal-error ${filePath}`);
+
+            assert.strictEqual(exitCode, 2);
+        });
+
+        it("should exit with exit code 2 if fatal error is found in any file", async () => {
+            const filePath = getFixturePath("exit-on-fatal-error");
+            const exitCode = await cli.execute(`--no-ignore --exit-on-fatal-error ${filePath}`);
+
+            assert.strictEqual(exitCode, 2);
+        });
+
+
     });
 
     describe("when passed --no-inline-config", () => {

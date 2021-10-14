@@ -12,6 +12,10 @@
 const rule = require("../../../lib/rules/key-spacing"),
     { RuleTester } = require("../../../lib/rule-tester");
 
+//------------------------------------------------------------------------------
+// Tests
+//------------------------------------------------------------------------------
+
 const ruleTester = new RuleTester();
 
 ruleTester.run("key-spacing", rule, {
@@ -892,16 +896,110 @@ ruleTester.run("key-spacing", rule, {
                 on: "value"
             }
         }]
-    }],
-
+    }
+    ],
     invalid: [{
+        code: "var a ={'key' : value };",
+        output: "var a ={'key':value };",
+        options: [{
+            beforeColon: false,
+            afterColon: false
+        }],
+        errors: [
+            {
+
+                type: "Literal",
+                messageId: "extraKey",
+                data: { computed: "", key: "key" },
+                line: 1,
+                column: 14,
+                endLine: 1,
+                endColumn: 15
+            },
+            {
+                type: "Identifier",
+                messageId: "extraValue",
+                data: { computed: "", key: "key" },
+                line: 1,
+                column: 15,
+                endLine: 1,
+                endColumn: 17
+            }
+        ]
+    }, {
+        code: "var a ={'key' :value };",
+        output: "var a ={'key': value };",
+        options: [{
+            beforeColon: false,
+            afterColon: true
+        }],
+        errors: [
+            {
+
+                type: "Literal",
+                messageId: "extraKey",
+                data: { computed: "", key: "key" },
+                line: 1,
+                column: 14,
+                endLine: 1,
+                endColumn: 15
+            },
+            {
+                type: "Identifier",
+                messageId: "missingValue",
+                data: { computed: "", key: "key" },
+                line: 1,
+                column: 16,
+                endLine: 1,
+                endColumn: 21
+            }
+        ]
+    }, {
+        code: "var a ={'key'\n : \nvalue };",
+        output: "var a ={'key':value };",
+        options: [{
+            beforeColon: false,
+            afterColon: false
+        }],
+        errors: [
+            {
+
+                type: "Literal",
+                messageId: "extraKey",
+                data: { computed: "", key: "key" },
+                line: 1,
+                column: 14,
+                endLine: 2,
+                endColumn: 2
+            },
+            {
+                type: "Identifier",
+                messageId: "extraValue",
+                data: { computed: "", key: "key" },
+                line: 2,
+                column: 2,
+                endLine: 3,
+                endColumn: 1
+            }
+        ]
+    }, {
         code: "var bat = function() { return { foo:bar, 'key': value }; };",
         output: "var bat = function() { return { foo:bar, 'key':value }; };",
         options: [{
             beforeColon: false,
             afterColon: false
         }],
-        errors: [{ messageId: "extraValue", data: { computed: "", key: "key" }, type: "Identifier", line: 1, column: 49 }]
+        errors: [
+            {
+                messageId: "extraValue",
+                data: { computed: "", key: "key" },
+                type: "Identifier",
+                line: 1,
+                column: 47,
+                endLine: 1,
+                endColumn: 49
+            }
+        ]
     }, {
         code: "var obj = { [ (a + b) ]:value };",
         output: "var obj = { [ (a + b) ]: value };",
@@ -915,7 +1013,7 @@ ruleTester.run("key-spacing", rule, {
             beforeColon: false,
             afterColon: false
         }],
-        errors: [{ messageId: "extraKey", data: { computed: "", key: "key" }, type: "Literal", line: 1, column: 15 }]
+        errors: [{ messageId: "extraKey", data: { computed: "", key: "key" }, type: "Literal", line: 1, column: 20, endLine: 1, endColumn: 21 }]
     }, {
         code: "var obj = {prop :(42)};",
         output: "var obj = {prop : (42)};",
@@ -940,10 +1038,10 @@ ruleTester.run("key-spacing", rule, {
             afterColon: true
         }],
         errors: [
-            { messageId: "extraKey", data: { computed: "", key: "a" }, type: "Literal", line: 1, column: 3 },
-            { messageId: "missingValue", data: { computed: "", key: "a" }, type: "CallExpression", line: 1, column: 9 },
-            { messageId: "missingKey", data: { computed: "", key: "b" }, type: "Identifier", line: 1, column: 16 },
-            { messageId: "extraValue", data: { computed: "", key: "b" }, type: "CallExpression", line: 1, column: 20 }
+            { messageId: "extraKey", data: { computed: "", key: "a" }, type: "Literal", line: 1, column: 6, endLine: 1, endColumn: 8 },
+            { messageId: "missingValue", data: { computed: "", key: "a" }, type: "CallExpression", line: 1, column: 9, endLine: 1, endColumn: 12 },
+            { messageId: "missingKey", data: { computed: "", key: "b" }, type: "Identifier", line: 1, column: 16, endLine: 1, endColumn: 17 },
+            { messageId: "extraValue", data: { computed: "", key: "b" }, type: "CallExpression", line: 1, column: 17, endLine: 1, endColumn: 20 }
         ]
     }, {
         code: "bar = { key:value };",
@@ -973,7 +1071,7 @@ ruleTester.run("key-spacing", rule, {
         }],
         errors: [
             { messageId: "missingKey", data: { computed: "", key: "key" }, type: "Identifier", line: 2, column: 5 },
-            { messageId: "extraValue", data: { computed: "", key: "key" }, type: "Identifier", line: 2, column: 12 },
+            { messageId: "extraValue", data: { computed: "", key: "key" }, type: "Identifier", line: 2, column: 8 },
             { messageId: "missingValue", data: { computed: "", key: "foobar" }, type: "CallExpression", line: 3, column: 12 }
         ]
     }, {
@@ -999,9 +1097,9 @@ ruleTester.run("key-spacing", rule, {
             afterColon: false
         }],
         errors: [
-            { messageId: "extraValue", data: { computed: "", key: "a" }, type: "Identifier", line: 2, column: 11 },
+            { messageId: "extraValue", data: { computed: "", key: "a" }, type: "Identifier", line: 2, column: 9 },
             { messageId: "missingKey", data: { computed: "", key: "foo" }, type: "Identifier", line: 3, column: 5 },
-            { messageId: "extraKey", data: { computed: "", key: "b" }, type: "Identifier", line: 4, column: 5 }
+            { messageId: "extraKey", data: { computed: "", key: "b" }, type: "Identifier", line: 4, column: 6 }
         ]
     }, {
         code: [
@@ -1027,10 +1125,10 @@ ruleTester.run("key-spacing", rule, {
         }],
         parserOptions: { ecmaVersion: 6 },
         errors: [
-            { messageId: "extraValue", data: { computed: "", key: "a" }, type: "CallExpression", line: 2, column: 11 },
-            { messageId: "extraKey", data: { computed: "", key: "b" }, type: "Literal", line: 3, column: 5 },
+            { messageId: "extraValue", data: { computed: "", key: "a" }, type: "CallExpression", line: 2, column: 6 },
+            { messageId: "extraKey", data: { computed: "", key: "b" }, type: "Literal", line: 3, column: 8 },
             { messageId: "missingValue", data: { computed: "", key: "foo" }, type: "Identifier", line: 4, column: 9 },
-            { messageId: "extraKey", data: { computed: "computed ", key: "a" }, type: "Identifier", line: 6, column: 7 }
+            { messageId: "extraKey", data: { computed: "computed ", key: "a" }, type: "Identifier", line: 6, column: 8 }
         ]
     }, {
         code: [
@@ -1056,7 +1154,7 @@ ruleTester.run("key-spacing", rule, {
         }],
         errors: [
             { messageId: "missingKey", data: { computed: "", key: "a" }, type: "Identifier", line: 2, column: 5 },
-            { messageId: "extraValue", data: { computed: "", key: "bar" }, type: "CallExpression", line: 5, column: 11 }
+            { messageId: "extraValue", data: { computed: "", key: "bar" }, type: "CallExpression", line: 5, column: 9 }
         ]
     }, {
         code: [
@@ -1105,8 +1203,8 @@ ruleTester.run("key-spacing", rule, {
             afterColon: false
         }],
         errors: [
-            { messageId: "extraValue", data: { computed: "", key: "key" }, type: "Identifier", line: 3, column: 9 },
-            { messageId: "extraKey", data: { computed: "", key: "key2" }, type: "Identifier", line: 4, column: 5 }
+            { messageId: "extraValue", data: { computed: "", key: "key" }, type: "Identifier", line: 2, column: 8 },
+            { messageId: "extraKey", data: { computed: "", key: "key2" }, type: "Identifier", line: 4, column: 9 }
         ]
     }, {
         code: [
@@ -1153,7 +1251,7 @@ ruleTester.run("key-spacing", rule, {
         output: "var obj = {a: 'foo', bar: 'bam'};",
         options: [{ align: "colon" }],
         errors: [
-            { messageId: "extraKey", data: { computed: "", key: "a" }, line: 1, column: 12, type: "Identifier" }
+            { messageId: "extraKey", data: { computed: "", key: "a" }, line: 1, column: 13, type: "Identifier" }
         ]
     }, {
         code: [
@@ -1170,7 +1268,7 @@ ruleTester.run("key-spacing", rule, {
         ].join("\n"),
         options: [{ align: "colon" }],
         errors: [
-            { messageId: "extraKey", data: { computed: "", key: "b" }, line: 3, column: 5, type: "Identifier" }
+            { messageId: "extraKey", data: { computed: "", key: "b" }, line: 3, column: 6, type: "Identifier" }
         ]
     }, {
         code: [
@@ -1203,7 +1301,7 @@ ruleTester.run("key-spacing", rule, {
             afterColon: true
         }],
         errors: [
-            { messageId: "extraValue", data: { computed: "", key: "key" }, line: 2, column: 8, type: "Identifier" }
+            { messageId: "extraValue", data: { computed: "", key: "key" }, line: 2, column: 2, type: "Identifier" }
         ]
     }, {
         code: [
@@ -1243,7 +1341,7 @@ ruleTester.run("key-spacing", rule, {
         options: [{ align: "value" }],
         parserOptions: { ecmaVersion: 6 },
         errors: [
-            { messageId: "extraValue", data: { computed: "", key: "foobar" }, line: 2, column: 14, type: "Literal" }
+            { messageId: "extraValue", data: { computed: "", key: "foobar" }, line: 2, column: 11, type: "Literal" }
         ]
     }, {
         code: [
@@ -1283,7 +1381,7 @@ ruleTester.run("key-spacing", rule, {
         options: [{ align: "value" }],
         parserOptions: { ecmaVersion: 6 },
         errors: [
-            { messageId: "extraValue", data: { computed: "", key: "foobar" }, line: 2, column: 14, type: "Literal" }
+            { messageId: "extraValue", data: { computed: "", key: "foobar" }, line: 2, column: 11, type: "Literal" }
         ]
     }, {
         code: [
@@ -1307,7 +1405,7 @@ ruleTester.run("key-spacing", rule, {
         options: [{ align: "value" }],
         parserOptions: { ecmaVersion: 6 },
         errors: [
-            { messageId: "extraValue", data: { computed: "", key: "baz" }, line: 6, column: 13, type: "Literal" }
+            { messageId: "extraValue", data: { computed: "", key: "baz" }, line: 6, column: 8, type: "Literal" }
         ]
     }, {
         code: [
@@ -1341,7 +1439,7 @@ ruleTester.run("key-spacing", rule, {
         ].join("\n"),
         options: [{ align: "colon" }],
         errors: [
-            { messageId: "extraValue", data: { computed: "", key: "cats" }, line: 3, column: 12, type: "Identifier" }
+            { messageId: "extraValue", data: { computed: "", key: "cats" }, line: 3, column: 9, type: "Identifier" }
         ]
     }, {
         code: [
@@ -1371,7 +1469,7 @@ ruleTester.run("key-spacing", rule, {
         ].join("\n"),
         options: [{ align: "colon" }],
         errors: [
-            { messageId: "extraKey", data: { computed: "", key: "foo" }, line: 1, column: 13, type: "Identifier" }
+            { messageId: "extraKey", data: { computed: "", key: "foo" }, line: 1, column: 16, type: "Identifier" }
         ]
     }, {
         code: [
@@ -1401,7 +1499,7 @@ ruleTester.run("key-spacing", rule, {
         ].join("\n"),
         options: [{ align: "colon" }],
         errors: [
-            { messageId: "extraValue", data: { computed: "", key: "foo" }, line: 1, column: 20, type: "Identifier" }
+            { messageId: "extraValue", data: { computed: "", key: "foo" }, line: 1, column: 17, type: "Identifier" }
         ]
     }, {
         code: [
@@ -1416,7 +1514,7 @@ ruleTester.run("key-spacing", rule, {
         ].join("\n"),
         options: [{ align: "colon" }],
         errors: [
-            { messageId: "extraValue", data: { computed: "", key: "cats" }, line: 2, column: 20, type: "Identifier" }
+            { messageId: "extraValue", data: { computed: "", key: "cats" }, line: 2, column: 17, type: "Identifier" }
         ]
     },
 
@@ -1456,7 +1554,7 @@ ruleTester.run("key-spacing", rule, {
         parserOptions: { ecmaVersion: 2018 },
         errors: [
             { messageId: "missingKey", data: { computed: "", key: "a" }, line: 3, column: 5, type: "Identifier" },
-            { messageId: "extraKey", data: { computed: "", key: "f" }, line: 12, column: 5, type: "Identifier" }
+            { messageId: "extraKey", data: { computed: "", key: "f" }, line: 12, column: 6, type: "Identifier" }
         ]
     },
 
@@ -1478,7 +1576,7 @@ ruleTester.run("key-spacing", rule, {
             align: "colon"
         }],
         errors: [
-            { messageId: "extraKey", data: { computed: "", key: "a" }, line: 2, column: 5, type: "Identifier" }
+            { messageId: "extraKey", data: { computed: "", key: "a" }, line: 2, column: 6, type: "Identifier" }
         ]
     }, {
         code: [
@@ -1497,7 +1595,7 @@ ruleTester.run("key-spacing", rule, {
             align: "value"
         }],
         errors: [
-            { messageId: "extraKey", data: { computed: "", key: "c" }, line: 3, column: 5, type: "Identifier" }
+            { messageId: "extraKey", data: { computed: "", key: "c" }, line: 3, column: 6, type: "Identifier" }
         ]
     }, {
         code: [
@@ -1554,7 +1652,7 @@ ruleTester.run("key-spacing", rule, {
             }
         }],
         errors: [
-            { messageId: "extraValue", data: { computed: "", key: "a1" }, line: 6, column: 17, type: "Literal" }
+            { messageId: "extraValue", data: { computed: "", key: "a1" }, line: 6, column: 15, type: "Literal" }
         ]
     }, {
         code: [
@@ -1635,7 +1733,7 @@ ruleTester.run("key-spacing", rule, {
             mode: "minimum"
         }],
         errors: [
-            { messageId: "extraKey", data: { computed: "", key: "ex" }, line: 4, column: 4, type: "Identifier" }
+            { messageId: "extraKey", data: { computed: "", key: "ex" }, line: 4, column: 6, type: "Identifier" }
         ]
     }, {
         code: [
@@ -1674,7 +1772,7 @@ ruleTester.run("key-spacing", rule, {
         parserOptions: { ecmaVersion: 2018 },
         errors: [
             { messageId: "missingValue", data: { computed: "", key: "a" }, line: 1, column: 6, type: "Identifier" },
-            { messageId: "extraKey", data: { computed: "", key: "c" }, line: 1, column: 20, type: "Identifier" }
+            { messageId: "extraKey", data: { computed: "", key: "c" }, line: 1, column: 21, type: "Identifier" }
         ]
     },
 
@@ -1755,8 +1853,8 @@ ruleTester.run("key-spacing", rule, {
             { messageId: "missingValue", data: { computed: "", key: "func" }, line: 2, column: 10, type: "FunctionExpression" },
             { messageId: "missingKey", data: { computed: "", key: "longName" }, line: 5, column: 5, type: "Identifier" },
             { messageId: "missingKey", data: { computed: "", key: "small" }, line: 6, column: 5, type: "Identifier" },
-            { messageId: "extraKey", data: { computed: "", key: "xs" }, line: 7, column: 5, type: "Identifier" },
-            { messageId: "extraKey", data: { computed: "", key: "singleLine" }, line: 11, column: 5, type: "Identifier" }
+            { messageId: "extraKey", data: { computed: "", key: "xs" }, line: 7, column: 7, type: "Identifier" },
+            { messageId: "extraKey", data: { computed: "", key: "singleLine" }, line: 11, column: 15, type: "Identifier" }
         ]
     }, {
         code: [
@@ -1803,10 +1901,10 @@ ruleTester.run("key-spacing", rule, {
         errors: [
             { messageId: "missingValue", data: { computed: "", key: "func" }, line: 2, column: 10, type: "FunctionExpression" },
             { messageId: "missingKey", data: { computed: "", key: "small" }, line: 6, column: 5, type: "Identifier" },
-            { messageId: "extraKey", data: { computed: "", key: "xs" }, line: 7, column: 5, type: "Identifier" },
-            { messageId: "extraValue", data: { computed: "", key: "xs" }, line: 7, column: 21, type: "Literal" },
-            { messageId: "extraValue", data: { computed: "", key: "func2" }, line: 8, column: 16, type: "FunctionExpression" },
-            { messageId: "extraKey", data: { computed: "", key: "singleLine" }, line: 11, column: 5, type: "Identifier" }
+            { messageId: "extraKey", data: { computed: "", key: "xs" }, line: 7, column: 7, type: "Identifier" },
+            { messageId: "extraValue", data: { computed: "", key: "xs" }, line: 7, column: 19, type: "Literal" },
+            { messageId: "extraValue", data: { computed: "", key: "func2" }, line: 8, column: 14, type: "FunctionExpression" },
+            { messageId: "extraKey", data: { computed: "", key: "singleLine" }, line: 11, column: 15, type: "Identifier" }
         ]
     }, {
         code: [
@@ -1843,8 +1941,8 @@ ruleTester.run("key-spacing", rule, {
         }],
         parserOptions: { ecmaVersion: 6 },
         errors: [
-            { messageId: "extraValue", data: { computed: "", key: "key2" }, line: 4, column: 14, type: "Literal" },
-            { messageId: "extraValue", data: { computed: "", key: "key3" }, line: 5, column: 14, type: "Literal" }
+            { messageId: "extraValue", data: { computed: "", key: "key2" }, line: 4, column: 9, type: "Literal" },
+            { messageId: "extraValue", data: { computed: "", key: "key3" }, line: 5, column: 9, type: "Literal" }
         ]
     }, {
         code: [
@@ -1881,20 +1979,20 @@ ruleTester.run("key-spacing", rule, {
         }],
         parserOptions: { ecmaVersion: 6 },
         errors: [
-            { messageId: "extraValue", data: { computed: "", key: "key2" }, line: 4, column: 14, type: "Literal" },
-            { messageId: "extraValue", data: { computed: "", key: "key3" }, line: 5, column: 14, type: "Literal" }
+            { messageId: "extraValue", data: { computed: "", key: "key2" }, line: 4, column: 9, type: "Literal" },
+            { messageId: "extraValue", data: { computed: "", key: "key3" }, line: 5, column: 9, type: "Literal" }
         ]
     }, {
 
         // https://github.com/eslint/eslint/issues/7603
         code: "({ foo/* comment */ : bar })",
         output: "({ foo/* comment */: bar })",
-        errors: [{ messageId: "extraKey", data: { computed: "", key: "foo" }, line: 1, column: 7, type: "Identifier" }]
+        errors: [{ messageId: "extraKey", data: { computed: "", key: "foo" }, line: 1, column: 20, type: "Identifier" }]
     }, {
         code: "({ foo: /* comment */bar })",
         output: "({ foo:/* comment */bar })",
         options: [{ afterColon: false }],
-        errors: [{ messageId: "extraValue", data: { computed: "", key: "foo" }, line: 1, column: 9, type: "Identifier" }]
+        errors: [{ messageId: "extraValue", data: { computed: "", key: "foo" }, line: 1, column: 7, type: "Identifier" }]
     },
     {
         code: "({ foo/*comment*/:/*comment*/bar })",
@@ -1951,10 +2049,10 @@ ruleTester.run("key-spacing", rule, {
             }
         }],
         errors: [
-            { messageId: "extraKey", data: { computed: "", key: "foo" }, line: 2, column: 5, type: "Identifier" },
-            { messageId: "extraKey", data: { computed: "", key: "bar" }, line: 2, column: 14, type: "Literal" },
-            { messageId: "extraKey", data: { computed: "", key: "baz" }, line: 2, column: 25, type: "Identifier" },
-            { messageId: "extraKey", data: { computed: "", key: "longlonglong" }, line: 2, column: 34, type: "Identifier" }
+            { messageId: "extraKey", data: { computed: "", key: "foo" }, line: 2, column: 8, type: "Identifier" },
+            { messageId: "extraKey", data: { computed: "", key: "bar" }, line: 2, column: 19, type: "Literal" },
+            { messageId: "extraKey", data: { computed: "", key: "baz" }, line: 2, column: 28, type: "Identifier" },
+            { messageId: "extraKey", data: { computed: "", key: "longlonglong" }, line: 2, column: 46, type: "Identifier" }
         ]
     }, {
         code: [
@@ -2015,10 +2113,10 @@ ruleTester.run("key-spacing", rule, {
             }
         }],
         errors: [
-            { messageId: "extraValue", data: { computed: "", key: "foo" }, line: 1, column: 18, type: "Literal" },
-            { messageId: "extraValue", data: { computed: "", key: "bar" }, line: 1, column: 28, type: "Literal" },
-            { messageId: "extraKey", data: { computed: "", key: "baz" }, line: 1, column: 31, type: "Identifier" },
-            { messageId: "extraKey", data: { computed: "", key: "longlonglong" }, line: 1, column: 39, type: "Identifier" }
+            { messageId: "extraValue", data: { computed: "", key: "foo" }, line: 1, column: 16, type: "Literal" },
+            { messageId: "extraValue", data: { computed: "", key: "bar" }, line: 1, column: 26, type: "Literal" },
+            { messageId: "extraKey", data: { computed: "", key: "baz" }, line: 1, column: 34, type: "Identifier" },
+            { messageId: "extraKey", data: { computed: "", key: "longlonglong" }, line: 1, column: 51, type: "Identifier" }
         ]
     }, {
         code: [

@@ -47,7 +47,7 @@ Specifying rules and plugins:
 Fixing problems:
   --fix                          Automatically fix problems
   --fix-dry-run                  Automatically fix problems without saving the changes to the file system
-  --fix-type Array               Specify the types of fixes to apply (problem, suggestion, layout)
+  --fix-type Array               Specify the types of fixes to apply (directive, problem, suggestion, layout)
 
 Ignoring files:
   --ignore-path path::String     Specify path of ignore file
@@ -75,11 +75,13 @@ Caching:
   --cache                        Only check changed files - default: false
   --cache-file path::String      Path to the cache file. Deprecated: use --cache-location - default: .eslintcache
   --cache-location path::String  Path to the cache file or directory
+  --cache-strategy String        Strategy to use for detecting changed files - either: metadata or content - default: metadata
 
 Miscellaneous:
   --init                         Run config initialization wizard - default: false
   --env-info                     Output execution environment information - default: false
   --no-error-on-unmatched-pattern  Prevent errors when pattern is unmatched - default: false
+  --exit-on-fatal-error          Exit with exit code 2 in case of fatal error - default: false
   --debug                        Output debugging information
   -h, --help                     Show help
   -v, --version                  Output the version number
@@ -118,7 +120,7 @@ If `.eslintrc.*` and/or `package.json` files are also used for configuration (i.
 
 #### `--env`
 
-This option enables specific environments. Details about the global variables defined by each environment are available on the [configuration](configuring.md) documentation. This option only enables environments; it does not disable environments set in other configuration files. To specify multiple environments, separate them using commas, or use the option multiple times.
+This option enables specific environments. Details about the global variables defined by each environment are available on the [Specifying Environments](configuring/language-options.md#specifying-environments) documentation. This option only enables environments; it does not disable environments set in other configuration files. To specify multiple environments, separate them using commas, or use the option multiple times.
 
 Examples:
 
@@ -238,11 +240,12 @@ This flag can be useful for integrations (e.g. editor plugins) which need to aut
 
 #### `--fix-type`
 
-This option allows you to specify the type of fixes to apply when using either `--fix` or `--fix-dry-run`. The three types of fixes are:
+This option allows you to specify the type of fixes to apply when using either `--fix` or `--fix-dry-run`. The four types of fixes are:
 
 1. `problem` - fix potential errors in the code
 1. `suggestion` - apply fixes to the code that improve it
 1. `layout` - apply fixes that do not change the program structure (AST)
+1. `directive` - apply fixes to inline directives such as `// eslint-disable`
 
 You can specify one or more fix type on the command line. Here are some examples:
 
@@ -275,7 +278,7 @@ Example:
 
 #### `--ignore-pattern`
 
-This option allows you to specify patterns of files to ignore (in addition to those in `.eslintignore`). You can repeat the option to provide multiple patterns. The supported syntax is the same as for `.eslintignore` [files](./configuring.md#.eslintignore), which use the same patterns as the `.gitignore` [specification](https://git-scm.com/docs/gitignore). You should quote your patterns in order to avoid shell interpretation of glob patterns.
+This option allows you to specify patterns of files to ignore (in addition to those in `.eslintignore`). You can repeat the option to provide multiple patterns. The supported syntax is the same as for `.eslintignore` [files](configuring/ignoring-code.md#the-eslintignore-file), which use the same patterns as the `.gitignore` [specification](https://git-scm.com/docs/gitignore). You should quote your patterns in order to avoid shell interpretation of glob patterns.
 
 Example:
 
@@ -336,14 +339,12 @@ When specified, the given format is output into the provided file name.
 This option specifies the output format for the console. Possible formats are:
 
 * [checkstyle](formatters.md/#checkstyle)
-* [codeframe](formatters.md/#codeframe)
 * [compact](formatters.md/#compact)
 * [html](formatters.md/#html)
 * [jslint-xml](formatters.md/#jslint-xml)
 * [json](formatters.md/#json)
 * [junit](formatters.md/#junit)
 * [stylish](formatters.md/#stylish) (the default)
-* [table](formatters.md/#table)
 * [tap](formatters.md/#tap)
 * [unix](formatters.md/#unix)
 * [visualstudio](formatters.md/#visualstudio)
@@ -440,6 +441,16 @@ Example:
 
     eslint "src/**/*.js" --cache --cache-location "/Users/user/.eslintcache/"
 
+#### `--cache-strategy`
+
+Strategy for the cache to use for detecting changed files. Can be either `metadata` or `content`. If no strategy is specified, `metadata` will be used.
+
+The `content` strategy can be useful in cases where the modification time of your files change even if their contents have not. For example, this can happen during git operations like git clone because git does not track file modification time.
+
+Example:
+
+    eslint "src/**/*.js" --cache --cache-strategy content
+
 ### Miscellaneous
 
 #### `--init`
@@ -455,6 +466,10 @@ This option outputs information about the execution environment, including the v
 #### `--no-error-on-unmatched-pattern`
 
 This option prevents errors when a quoted glob pattern or `--ext` is unmatched. This will not prevent errors when your shell can't match a glob.
+
+#### `--exit-on-fatal-error`
+
+This option causes ESLint to exit with exit code 2 if one or more fatal parsing errors occur. Without this option, fatal parsing errors are reported as rule violations.
 
 #### `--debug`
 
@@ -483,7 +498,7 @@ ESLint supports `.eslintignore` files to exclude files from the linting process 
     temp.js
     **/vendor/*.js
 
-A more detailed breakdown of supported patterns and directories ESLint ignores by default can be found in [Configuring ESLint](configuring.md#ignoring-files-and-directories).
+A more detailed breakdown of supported patterns and directories ESLint ignores by default can be found in [Ignoring Code](configuring/ignoring-code.md).
 
 ## Exit codes
 

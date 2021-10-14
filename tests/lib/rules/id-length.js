@@ -18,7 +18,9 @@ const rule = require("../../../lib/rules/id-length"),
 
 const ruleTester = new RuleTester();
 const tooShortError = { messageId: "tooShort", type: "Identifier" };
+const tooShortErrorPrivate = { messageId: "tooShortPrivate", type: "PrivateIdentifier" };
 const tooLongError = { messageId: "tooLong", type: "Identifier" };
+const tooLongErrorPrivate = { messageId: "tooLongPrivate", type: "PrivateIdentifier" };
 
 ruleTester.run("id-length", rule, {
     valid: [
@@ -77,7 +79,41 @@ ruleTester.run("id-length", rule, {
         { code: "var {x} = foo;", options: [{ properties: "never" }], parserOptions: { ecmaVersion: 6 } },
         { code: "var {x, y: {z}} = foo;", options: [{ properties: "never" }], parserOptions: { ecmaVersion: 6 } },
         { code: "let foo = { [a]: 1 };", options: [{ properties: "always" }], parserOptions: { ecmaVersion: 6 } },
-        { code: "let foo = { [a + b]: 1 };", options: [{ properties: "always" }], parserOptions: { ecmaVersion: 6 } }
+        { code: "let foo = { [a + b]: 1 };", options: [{ properties: "always" }], parserOptions: { ecmaVersion: 6 } },
+        { code: "function BEFORE_send() {};", options: [{ min: 3, max: 5, exceptionPatterns: ["^BEFORE_"] }] },
+        { code: "function BEFORE_send() {};", options: [{ min: 3, max: 5, exceptionPatterns: ["^BEFORE_", "send$"] }] },
+        { code: "function BEFORE_send() {};", options: [{ min: 3, max: 5, exceptionPatterns: ["^BEFORE_", "^A", "^Z"] }] },
+        { code: "function BEFORE_send() {};", options: [{ min: 3, max: 5, exceptionPatterns: ["^A", "^BEFORE_", "^Z"] }] },
+        { code: "var x = 1 ;", options: [{ min: 3, max: 5, exceptionPatterns: ["[x-z]"] }] },
+
+        // Class Fields
+        {
+            code: "class Foo { #xyz() {} }",
+            parserOptions: { ecmaVersion: 2022 }
+        },
+        {
+            code: "class Foo { xyz = 1 }",
+            parserOptions: { ecmaVersion: 2022 }
+        },
+        {
+            code: "class Foo { #xyz = 1 }",
+            parserOptions: { ecmaVersion: 2022 }
+        },
+        {
+            code: "class Foo { #abc() {} }",
+            options: [{ max: 3 }],
+            parserOptions: { ecmaVersion: 2022 }
+        },
+        {
+            code: "class Foo { abc = 1 }",
+            options: [{ max: 3 }],
+            parserOptions: { ecmaVersion: 2022 }
+        },
+        {
+            code: "class Foo { #abc = 1 }",
+            options: [{ max: 3 }],
+            parserOptions: { ecmaVersion: 2022 }
+        }
     ],
     invalid: [
         { code: "var x = 1;", errors: [tooShortError] },
@@ -103,6 +139,13 @@ ruleTester.run("id-length", rule, {
         {
             code: "var _$x$_t$ = Foo(42)",
             options: [{ min: 2, max: 4 }],
+            errors: [
+                tooLongError
+            ]
+        },
+        {
+            code: "var toString;",
+            options: [{ max: 5 }],
             errors: [
                 tooLongError
             ]
@@ -193,6 +236,19 @@ ruleTester.run("id-length", rule, {
                     data: { name: "b", min: 2 },
                     line: 1,
                     column: 19,
+                    type: "Identifier"
+                }
+            ]
+        },
+        {
+            code: "var hasOwnProperty;",
+            options: [{ max: 10, exceptions: [] }],
+            errors: [
+                {
+                    messageId: "tooLong",
+                    data: { name: "hasOwnProperty", max: 10 },
+                    line: 1,
+                    column: 5,
                     type: "Identifier"
                 }
             ]
@@ -439,6 +495,74 @@ ruleTester.run("id-length", rule, {
             parserOptions: { ecmaVersion: 6 },
             errors: [
                 tooShortError
+            ]
+        },
+        {
+            code: "function BEFORE_send() {};",
+            options: [{ min: 3, max: 5 }],
+            errors: [
+                tooLongError
+            ]
+        },
+        {
+            code: "function NOTMATCHED_send() {};",
+            options: [{ min: 3, max: 5, exceptionPatterns: ["^BEFORE_"] }],
+            errors: [
+                tooLongError
+            ]
+        },
+        {
+            code: "function N() {};",
+            options: [{ min: 3, max: 5, exceptionPatterns: ["^BEFORE_"] }],
+            errors: [
+                tooShortError
+            ]
+        },
+
+        // Class Fields
+        {
+            code: "class Foo { #x() {} }",
+            parserOptions: { ecmaVersion: 2022 },
+            errors: [
+                tooShortErrorPrivate
+            ]
+        },
+        {
+            code: "class Foo { x = 1 }",
+            parserOptions: { ecmaVersion: 2022 },
+            errors: [
+                tooShortError
+            ]
+        },
+        {
+            code: "class Foo { #x = 1 }",
+            parserOptions: { ecmaVersion: 2022 },
+            errors: [
+                tooShortErrorPrivate
+            ]
+        },
+        {
+            code: "class Foo { #abcdefg() {} }",
+            options: [{ max: 3 }],
+            parserOptions: { ecmaVersion: 2022 },
+            errors: [
+                tooLongErrorPrivate
+            ]
+        },
+        {
+            code: "class Foo { abcdefg = 1 }",
+            options: [{ max: 3 }],
+            parserOptions: { ecmaVersion: 2022 },
+            errors: [
+                tooLongError
+            ]
+        },
+        {
+            code: "class Foo { #abcdefg = 1 }",
+            options: [{ max: 3 }],
+            parserOptions: { ecmaVersion: 2022 },
+            errors: [
+                tooLongErrorPrivate
             ]
         }
     ]

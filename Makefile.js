@@ -3,18 +3,14 @@
  * @author nzakas
  */
 
-/* global target */
-/* eslint no-use-before-define: "off", no-console: "off" */
+/* eslint no-use-before-define: "off", no-console: "off" -- CLI */
 "use strict";
 
 //------------------------------------------------------------------------------
 // Requirements
 //------------------------------------------------------------------------------
 
-require("shelljs/make");
-
-const lodash = require("lodash"),
-    checker = require("npm-license"),
+const checker = require("npm-license"),
     ReleaseOps = require("eslint-release"),
     dateformat = require("dateformat"),
     fs = require("fs"),
@@ -29,6 +25,13 @@ const lodash = require("lodash"),
     { CLIEngine } = require("./lib/cli-engine"),
     builtinRules = require("./lib/rules/index");
 
+require("shelljs/make");
+/* global target -- global.target is declared in `shelljs/make.js` */
+/**
+ * global.target = {};
+ * @see https://github.com/shelljs/shelljs/blob/124d3349af42cb794ae8f78fc9b0b538109f7ca7/make.js#L4
+ * @see https://github.com/DefinitelyTyped/DefinitelyTyped/blob/3aa2d09b6408380598cfb802743b07e1edb725f3/types/shelljs/make.d.ts#L8-L11
+ */
 const { cat, cd, cp, echo, exec, exit, find, ls, mkdir, pwd, rm, test } = require("shelljs");
 
 //------------------------------------------------------------------------------
@@ -44,7 +47,7 @@ const { cat, cd, cp, echo, exec, exit, find, ls, mkdir, pwd, rm, test } = requir
 const PERF_MULTIPLIER = 13e6;
 
 const OPEN_SOURCE_LICENSES = [
-    /MIT/u, /BSD/u, /Apache/u, /ISC/u, /WTF/u, /Public Domain/u, /LGPL/u
+    /MIT/u, /BSD/u, /Apache/u, /ISC/u, /WTF/u, /Public Domain/u, /LGPL/u, /Python/u
 ];
 
 //------------------------------------------------------------------------------
@@ -67,7 +70,8 @@ const NODE = "node ", // intentional extra space
     // Files
     RULE_FILES = glob.sync("lib/rules/*.js").filter(filePath => path.basename(filePath) !== "index.js"),
     JSON_FILES = find("conf/").filter(fileType("json")),
-    MARKDOWN_FILES_ARRAY = find("docs/").concat(ls(".")).filter(fileType("md")),
+    MARKDOWNLINT_IGNORED_FILES = fs.readFileSync(path.join(__dirname, ".markdownlintignore"), "utf-8").split("\n"),
+    MARKDOWN_FILES_ARRAY = find("docs/").concat(ls(".")).filter(fileType("md")).filter(file => !MARKDOWNLINT_IGNORED_FILES.includes(file)),
     TEST_FILES = "\"tests/{bin,lib,tools}/**/*.js\"",
     PERF_ESLINTRC = path.join(PERF_TMP_DIR, "eslintrc.yml"),
     PERF_MULTIFILES_TARGET_DIR = path.join(PERF_TMP_DIR, "eslint"),
@@ -149,8 +153,8 @@ function generateBlogPost(releaseInfo, prereleaseMajorVersion) {
 
 /**
  * Generates a doc page with formatter result examples
- * @param  {Object} formatterInfo Linting results from each formatter
- * @param  {string} [prereleaseVersion] The version used for a prerelease. This
+ * @param {Object} formatterInfo Linting results from each formatter
+ * @param {string} [prereleaseVersion] The version used for a prerelease. This
  *      changes where the output is stored.
  * @returns {void}
  */
@@ -177,8 +181,8 @@ function generateFormatterExamples(formatterInfo, prereleaseVersion) {
  */
 function generateRuleIndexPage() {
     const outputFile = "../website/_data/rules.yml",
-        categoryList = "conf/category-list.json",
-        categoriesData = JSON.parse(cat(path.resolve(categoryList)));
+        ruleTypes = "conf/rule-type-list.json",
+        ruleTypesData = JSON.parse(cat(path.resolve(ruleTypes)));
 
     RULE_FILES
         .map(filename => [filename, path.basename(filename, ".js")])
@@ -189,7 +193,7 @@ function generateRuleIndexPage() {
             const rule = require(path.resolve(filename));
 
             if (rule.meta.deprecated) {
-                categoriesData.deprecated.rules.push({
+                ruleTypesData.deprecated.rules.push({
                     name: basename,
                     replacedBy: rule.meta.replacedBy || []
                 });
@@ -198,22 +202,23 @@ function generateRuleIndexPage() {
                         name: basename,
                         description: rule.meta.docs.description,
                         recommended: rule.meta.docs.recommended || false,
-                        fixable: !!rule.meta.fixable
+                        fixable: !!rule.meta.fixable,
+                        hasSuggestions: !!rule.meta.hasSuggestions
                     },
-                    category = lodash.find(categoriesData.categories, { name: rule.meta.docs.category });
+                    ruleType = ruleTypesData.types.find(c => c.name === rule.meta.type);
 
-                if (!category.rules) {
-                    category.rules = [];
+                if (!ruleType.rules) {
+                    ruleType.rules = [];
                 }
 
-                category.rules.push(output);
+                ruleType.rules.push(output);
             }
         });
 
     // `.rules` will be `undefined` if all rules in category are deprecated.
-    categoriesData.categories = categoriesData.categories.filter(category => !!category.rules);
+    ruleTypesData.types = ruleTypesData.types.filter(ruleType => !!ruleType.rules);
 
-    const output = yaml.safeDump(categoriesData, { sortKeys: true });
+    const output = yaml.dump(ruleTypesData, { sortKeys: true });
 
     output.to(outputFile);
 }
@@ -389,7 +394,7 @@ function getFirstVersionOfDeletion(filePath) {
  * @private
  */
 function lintMarkdown(files) {
-    const config = yaml.safeLoad(fs.readFileSync(path.join(__dirname, "./.markdownlint.yml"), "utf8")),
+    const config = yaml.load(fs.readFileSync(path.join(__dirname, "./.markdownlint.yml"), "utf8")),
         result = markdownlint.sync({
             files,
             config,
@@ -472,10 +477,6 @@ function getBinFile(command) {
 // Tasks
 //------------------------------------------------------------------------------
 
-target.all = function() {
-    target.test();
-};
-
 target.lint = function([fix = false] = []) {
     let errors = 0,
         lastReturn;
@@ -487,7 +488,7 @@ target.lint = function([fix = false] = []) {
     }
 
     echo("Validating JSON Files");
-    lodash.forEach(JSON_FILES, validateJsonFile);
+    JSON_FILES.forEach(validateJsonFile);
 
     echo("Validating Markdown Files");
     lastReturn = lintMarkdown(MARKDOWN_FILES_ARRAY);
@@ -545,12 +546,12 @@ target.mocha = () => {
 
     echo("Running unit tests");
 
-    lastReturn = exec(`${getBinFile("nyc")} -- ${MOCHA} -R progress -t ${MOCHA_TIMEOUT} -c ${TEST_FILES}`);
+    lastReturn = exec(`${getBinFile("nyc")} -- ${MOCHA} --forbid-only -R progress -t ${MOCHA_TIMEOUT} -c ${TEST_FILES}`);
     if (lastReturn.code !== 0) {
         errors++;
     }
 
-    lastReturn = exec(`${getBinFile("nyc")} check-coverage --statement 99 --branch 98 --function 99 --lines 99`);
+    lastReturn = exec(`${getBinFile("nyc")} check-coverage --statement 98 --branch 97 --function 98 --lines 98`);
     if (lastReturn.code !== 0) {
         errors++;
     }
@@ -579,12 +580,6 @@ target.test = function() {
     target.karma();
     target.fuzz({ amount: 150, fuzzBrokenAutofixes: false });
     target.checkLicenses();
-};
-
-target.docs = function() {
-    echo("Generating documentation");
-    exec(`${getBinFile("jsdoc")} -d jsdoc lib`);
-    echo("Documentation has been output to /jsdoc");
 };
 
 target.gensite = function(prereleaseVersion) {
@@ -637,10 +632,12 @@ target.gensite = function(prereleaseVersion) {
         };
     }
 
-    const rules = require(".").linter.getRules();
+    const { Linter } = require(".");
+    const rules = new Linter().getRules();
 
     const RECOMMENDED_TEXT = "\n\n(recommended) The `\"extends\": \"eslint:recommended\"` property in a configuration file enables this rule.";
     const FIXABLE_TEXT = "\n\n(fixable) The `--fix` option on the [command line](../user-guide/command-line-interface#fixing-problems) can automatically fix some of the problems reported by this rule.";
+    const HAS_SUGGESTIONS_TEXT = "\n\n(hasSuggestions) Some problems reported by this rule are manually fixable by editor [suggestions](../developer-guide/working-with-rules#providing-suggestions).";
 
     // 4. Loop through all files in temporary directory
     process.stdout.write("> Updating files (Steps 4-9): 0/... - ...\r");
@@ -670,13 +667,14 @@ target.gensite = function(prereleaseVersion) {
                 const rule = rules.get(ruleName);
                 const isRecommended = rule && rule.meta.docs.recommended;
                 const isFixable = rule && rule.meta.fixable;
+                const hasSuggestions = rule && rule.meta.hasSuggestions;
 
                 // Incorporate the special portion into the documentation content
                 const textSplit = text.split("\n");
                 const ruleHeading = textSplit[0];
                 const ruleDocsContent = textSplit.slice(1).join("\n");
 
-                text = `${ruleHeading}${isRecommended ? RECOMMENDED_TEXT : ""}${isFixable ? FIXABLE_TEXT : ""}\n${ruleDocsContent}`;
+                text = `${ruleHeading}${isRecommended ? RECOMMENDED_TEXT : ""}${isFixable ? FIXABLE_TEXT : ""}${hasSuggestions ? HAS_SUGGESTIONS_TEXT : ""}\n${ruleDocsContent}`;
                 title = `${ruleName} - Rules`;
 
                 if (rule && rule.meta) {
@@ -818,6 +816,20 @@ target.checkRuleFiles = function() {
             return idNewAtBeginningOfTitleRegExp.test(docText) || idOldAtEndOfTitleRegExp.test(docText);
         }
 
+        /**
+         * Check if deprecated information is in rule code and READNE.md.
+         * @returns {boolean} true if present
+         * @private
+         */
+        function hasDeprecatedInfo() {
+            const ruleCode = cat(filename);
+            const deprecatedTagRegExp = /@deprecated in ESLint/u;
+            const docText = cat(docFilename);
+            const deprecatedInfoRegExp = /This rule was .+deprecated.+in ESLint/u;
+
+            return deprecatedTagRegExp.test(ruleCode) && deprecatedInfoRegExp.test(docText);
+        }
+
         // check for docs
         if (!test("-f", docFilename)) {
             console.error("Missing documentation for rule %s", basename);
@@ -844,12 +856,17 @@ target.checkRuleFiles = function() {
         if (!ruleDef) {
             console.error(`Missing rule from index (./lib/rules/index.js): ${basename}. If you just added a new rule then add an entry for it in this file.`);
             errors++;
-        }
+        } else {
 
-        // check eslint:recommended
-        const recommended = require("./conf/eslint-recommended");
+            // check deprecated
+            if (ruleDef.meta.deprecated && !hasDeprecatedInfo()) {
+                console.error(`Missing deprecated information in ${basename} rule code or README.md. Please write @deprecated tag in code or 「This rule was deprecated in ESLint ...」 in README.md.`);
+                errors++;
+            }
 
-        if (ruleDef) {
+            // check eslint:recommended
+            const recommended = require("./conf/eslint-recommended");
+
             if (ruleDef.meta.docs.recommended) {
                 if (recommended.rules[basename] !== "error") {
                     console.error(`Missing rule from eslint:recommended (./conf/eslint-recommended.js): ${basename}. If you just made a rule recommended then add an entry for it in this file.`);
@@ -959,13 +976,19 @@ function createConfigForPerformanceTest() {
 }
 
 /**
+ * @callback TimeCallback
+ * @param {?int[]} results
+ * @returns {void}
+ */
+
+/**
  * Calculates the time for each run for performance
  * @param {string} cmd cmd
  * @param {int} runs Total number of runs to do
  * @param {int} runNumber Current run number
  * @param {int[]} results Collection results from each run
- * @param {Function} cb Function to call when everything is done
- * @returns {int[]} calls the cb with all the results
+ * @param {TimeCallback} cb Function to call when everything is done
+ * @returns {void} calls the cb with all the results
  * @private
  */
 function time(cmd, runs, runNumber, results, cb) {

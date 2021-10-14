@@ -1,5 +1,7 @@
 "use strict";
+const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
 
+/** @type {import("webpack").Configuration} */
 module.exports = {
     mode: "none",
     entry: {
@@ -37,13 +39,15 @@ module.exports = {
                             targets: ">0.5%, not chrome 49, not ie 11, not safari 5.1"
                         }]
                     ]
-                },
-                exclude: /node_modules[\\/]lodash/u
+                }
             }
         ]
     },
+    plugins: [
+        new NodePolyfillPlugin()
+    ],
     resolve: {
-        mainFields: ["main", "module"]
+        mainFields: ["browser", "main", "module"]
     },
     stats: "errors-only"
 };

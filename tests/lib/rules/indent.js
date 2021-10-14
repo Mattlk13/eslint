@@ -15,7 +15,7 @@ const fs = require("fs");
 const path = require("path");
 
 //------------------------------------------------------------------------------
-// Tests
+// Helpers
 //------------------------------------------------------------------------------
 
 const fixture = fs.readFileSync(path.join(__dirname, "../../fixtures/rules/indent/indent-invalid-fixture-1.js"), "utf8");
@@ -55,6 +55,10 @@ function expectedErrors(providedIndentType, providedErrors) {
         line: err[0]
     }));
 }
+
+//------------------------------------------------------------------------------
+// Tests
+//------------------------------------------------------------------------------
 
 const ruleTester = new RuleTester({ parserOptions: { ecmaVersion: 8, ecmaFeatures: { jsx: true } } });
 
@@ -2206,6 +2210,26 @@ ruleTester.run("indent", rule, {
         },
         {
             code: unIndent`
+              condition1
+                ? condition2
+                  ? Promise.resolve(1)
+                  : Promise.resolve(2)
+                : Promise.resolve(3)
+            `,
+            options: [2, { offsetTernaryExpressions: true }]
+        },
+        {
+            code: unIndent`
+              condition1
+                ? Promise.resolve(1)
+                : condition2
+                  ? Promise.resolve(2)
+                  : Promise.resolve(3)
+            `,
+            options: [2, { offsetTernaryExpressions: true }]
+        },
+        {
+            code: unIndent`
               condition
               \t? () => {
               \t\t\treturn true
@@ -4125,7 +4149,7 @@ ruleTester.run("indent", rule, {
         //----------------------------------------------------------------------
         // JSX tests
         // https://github.com/eslint/eslint/issues/8425
-        // Some of the following tests are adapted from the the tests in eslint-plugin-react.
+        // Some of the following tests are adapted from the tests in eslint-plugin-react.
         // License: https://github.com/yannickcr/eslint-plugin-react/blob/7ca9841f22d599f447a27ef5b2a97def9229d6c8/LICENSE
         //----------------------------------------------------------------------
 
@@ -5724,6 +5748,105 @@ ruleTester.run("indent", rule, {
             `,
             options: [4, { MemberExpression: 2 }],
             parserOptions: { ecmaVersion: 2015 }
+        },
+        {
+            code: unIndent`
+                const foo = async (arg1,
+                                   arg2) =>
+                {
+                  return arg1 + arg2;
+                }
+            `,
+            options: [2, { FunctionDeclaration: { parameters: "first" }, FunctionExpression: { parameters: "first" } }]
+        },
+        {
+            code: unIndent`
+                const foo = async /* some comments */(arg1,
+                                                      arg2) =>
+                {
+                  return arg1 + arg2;
+                }
+            `,
+            options: [2, { FunctionDeclaration: { parameters: "first" }, FunctionExpression: { parameters: "first" } }]
+        },
+        {
+            code: unIndent`
+                const a = async
+                b => {}
+            `,
+            options: [2]
+        },
+        {
+            code: unIndent`
+                const foo = (arg1,
+                             arg2) => async (arr1,
+                                             arr2) =>
+                {
+                  return arg1 + arg2;
+                }
+            `,
+            options: [2, { FunctionDeclaration: { parameters: "first" }, FunctionExpression: { parameters: "first" } }]
+        },
+        {
+            code: unIndent`
+                const foo = async (arg1,
+                  arg2) =>
+                {
+                  return arg1 + arg2;
+                }
+            `,
+            options: [2]
+        },
+        {
+            code: unIndent`
+                const foo = async /*comments*/(arg1,
+                  arg2) =>
+                {
+                  return arg1 + arg2;
+                }
+            `,
+            options: [2]
+        },
+        {
+            code: unIndent`
+                const foo = async (arg1,
+                        arg2) =>
+                {
+                  return arg1 + arg2;
+                }
+            `,
+            options: [2, { FunctionDeclaration: { parameters: 4 }, FunctionExpression: { parameters: 4 } }]
+        },
+        {
+            code: unIndent`
+                const foo = (arg1,
+                        arg2) =>
+                {
+                  return arg1 + arg2;
+                }
+            `,
+            options: [2, { FunctionDeclaration: { parameters: 4 }, FunctionExpression: { parameters: 4 } }]
+        },
+        {
+            code: unIndent`
+                async function fn(ar1,
+                                  ar2){}
+            `,
+            options: [2, { FunctionDeclaration: { parameters: "first" }, FunctionExpression: { parameters: "first" } }]
+        },
+        {
+            code: unIndent`
+                async function /* some comments */ fn(ar1,
+                                                      ar2){}
+            `,
+            options: [2, { FunctionDeclaration: { parameters: "first" }, FunctionExpression: { parameters: "first" } }]
+        },
+        {
+            code: unIndent`
+                async  /* some comments */  function fn(ar1,
+                                                        ar2){}
+            `,
+            options: [2, { FunctionDeclaration: { parameters: "first" }, FunctionExpression: { parameters: "first" } }]
         }
     ],
 
@@ -9726,7 +9849,7 @@ ruleTester.run("indent", rule, {
 
         //----------------------------------------------------------------------
         // JSX tests
-        // Some of the following tests are adapted from the the tests in eslint-plugin-react.
+        // Some of the following tests are adapted from the tests in eslint-plugin-react.
         // License: https://github.com/yannickcr/eslint-plugin-react/blob/7ca9841f22d599f447a27ef5b2a97def9229d6c8/LICENSE
         //----------------------------------------------------------------------
 
@@ -11373,6 +11496,323 @@ ruleTester.run("indent", rule, {
                 [2, 0, 4, "Punctuator"],
                 [5, 4, 0, "Identifier"],
                 [6, 0, 4, "Punctuator"]
+            ])
+        },
+
+        // Optional chaining
+        {
+            code: unIndent`
+                obj
+                ?.prop
+                ?.[key]
+                ?.
+                [key]
+            `,
+            output: unIndent`
+                obj
+                    ?.prop
+                    ?.[key]
+                    ?.
+                        [key]
+            `,
+            options: [4],
+            parserOptions: { ecmaVersion: 2020 },
+            errors: expectedErrors([
+                [2, 4, 0, "Punctuator"],
+                [3, 4, 0, "Punctuator"],
+                [4, 4, 0, "Punctuator"],
+                [5, 8, 0, "Punctuator"]
+            ])
+        },
+        {
+            code: unIndent`
+                (
+                    longSomething
+                        ?.prop
+                        ?.[key]
+                )
+                ?.prop
+                ?.[key]
+            `,
+            output: unIndent`
+                (
+                    longSomething
+                        ?.prop
+                        ?.[key]
+                )
+                    ?.prop
+                    ?.[key]
+            `,
+            options: [4],
+            parserOptions: { ecmaVersion: 2020 },
+            errors: expectedErrors([
+                [6, 4, 0, "Punctuator"],
+                [7, 4, 0, "Punctuator"]
+            ])
+        },
+        {
+            code: unIndent`
+                obj
+                ?.(arg)
+                ?.
+                (arg)
+            `,
+            output: unIndent`
+                obj
+                    ?.(arg)
+                    ?.
+                    (arg)
+            `,
+            options: [4],
+            parserOptions: { ecmaVersion: 2020 },
+            errors: expectedErrors([
+                [2, 4, 0, "Punctuator"],
+                [3, 4, 0, "Punctuator"],
+                [4, 4, 0, "Punctuator"]
+            ])
+        },
+        {
+            code: unIndent`
+                (
+                    longSomething
+                        ?.(arg)
+                        ?.(arg)
+                )
+                ?.(arg)
+                ?.(arg)
+            `,
+            output: unIndent`
+                (
+                    longSomething
+                        ?.(arg)
+                        ?.(arg)
+                )
+                    ?.(arg)
+                    ?.(arg)
+            `,
+            options: [4],
+            parserOptions: { ecmaVersion: 2020 },
+            errors: expectedErrors([
+                [6, 4, 0, "Punctuator"],
+                [7, 4, 0, "Punctuator"]
+            ])
+        },
+        {
+            code: unIndent`
+                const foo = async (arg1,
+                                    arg2) =>
+                {
+                  return arg1 + arg2;
+                }
+            `,
+            output: unIndent`
+                const foo = async (arg1,
+                                   arg2) =>
+                {
+                  return arg1 + arg2;
+                }
+            `,
+            options: [2, { FunctionDeclaration: { parameters: "first" }, FunctionExpression: { parameters: "first" } }],
+            parserOptions: { ecmaVersion: 2020 },
+            errors: expectedErrors([
+                [2, 19, 20, "Identifier"]
+            ])
+        },
+        {
+            code: unIndent`
+                const a = async
+                 b => {}
+            `,
+            output: unIndent`
+                const a = async
+                b => {}
+            `,
+            options: [2],
+            errors: expectedErrors([
+                [2, 0, 1, "Identifier"]
+            ])
+        },
+        {
+            code: unIndent`
+                class C {
+                field1;
+                static field2;
+                }
+            `,
+            output: unIndent`
+                class C {
+                    field1;
+                    static field2;
+                }
+            `,
+            options: [4],
+            parserOptions: { ecmaVersion: 2022 },
+            errors: expectedErrors([
+                [2, 4, 0, "Identifier"],
+                [3, 4, 0, "Keyword"]
+            ])
+        },
+        {
+            code: unIndent`
+                class C {
+                field1
+                =
+                0
+                ;
+                static
+                field2
+                =
+                0
+                ;
+                }
+            `,
+            output: unIndent`
+                class C {
+                    field1
+                        =
+                            0
+                            ;
+                    static
+                        field2
+                            =
+                                0
+                                ;
+                }
+            `,
+            options: [4],
+            parserOptions: { ecmaVersion: 2022 },
+            errors: expectedErrors([
+                [2, 4, 0, "Identifier"],
+                [3, 8, 0, "Punctuator"],
+                [4, 12, 0, "Numeric"],
+                [5, 12, 0, "Punctuator"],
+                [6, 4, 0, "Keyword"],
+                [7, 8, 0, "Identifier"],
+                [8, 12, 0, "Punctuator"],
+                [9, 16, 0, "Numeric"],
+                [10, 16, 0, "Punctuator"]
+            ])
+        },
+        {
+            code: unIndent`
+                class C {
+                [
+                field1
+                ]
+                =
+                0
+                ;
+                static
+                [
+                field2
+                ]
+                =
+                0
+                ;
+                [
+                field3
+                ] =
+                0;
+                [field4] =
+                0;
+                }
+            `,
+            output: unIndent`
+                class C {
+                    [
+                        field1
+                    ]
+                        =
+                            0
+                            ;
+                    static
+                    [
+                        field2
+                    ]
+                        =
+                            0
+                            ;
+                    [
+                        field3
+                    ] =
+                        0;
+                    [field4] =
+                        0;
+                }
+            `,
+            options: [4],
+            parserOptions: { ecmaVersion: 2022 },
+            errors: expectedErrors([
+                [2, 4, 0, "Punctuator"],
+                [3, 8, 0, "Identifier"],
+                [4, 4, 0, "Punctuator"],
+                [5, 8, 0, "Punctuator"],
+                [6, 12, 0, "Numeric"],
+                [7, 12, 0, "Punctuator"],
+                [8, 4, 0, "Keyword"],
+                [9, 4, 0, "Punctuator"],
+                [10, 8, 0, "Identifier"],
+                [11, 4, 0, "Punctuator"],
+                [12, 8, 0, "Punctuator"],
+                [13, 12, 0, "Numeric"],
+                [14, 12, 0, "Punctuator"],
+                [15, 4, 0, "Punctuator"],
+                [16, 8, 0, "Identifier"],
+                [17, 4, 0, "Punctuator"],
+                [18, 8, 0, "Numeric"],
+                [19, 4, 0, "Punctuator"],
+                [20, 8, 0, "Numeric"]
+            ])
+        },
+        {
+            code: unIndent`
+                class C {
+                field1 = (
+                foo
+                + bar
+                );
+                }
+            `,
+            output: unIndent`
+                class C {
+                    field1 = (
+                        foo
+                + bar
+                    );
+                }
+            `,
+            options: [4],
+            parserOptions: { ecmaVersion: 2022 },
+            errors: expectedErrors([
+                [2, 4, 0, "Identifier"],
+                [3, 8, 0, "Identifier"],
+                [5, 4, 0, "Punctuator"]
+            ])
+        },
+        {
+            code: unIndent`
+                class C {
+                #aaa
+                foo() {
+                return this.#aaa
+                }
+                }
+            `,
+            output: unIndent`
+                class C {
+                    #aaa
+                    foo() {
+                        return this.#aaa
+                    }
+                }
+            `,
+            options: [4],
+            parserOptions: { ecmaVersion: 2022 },
+            errors: expectedErrors([
+                [2, 4, 0, "PrivateIdentifier"],
+                [3, 4, 0, "Identifier"],
+                [4, 8, 0, "Keyword"],
+                [5, 4, 0, "Punctuator"]
             ])
         }
     ]

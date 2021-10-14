@@ -1,3 +1,15 @@
+/*
+ * STOP!!! DO NOT MODIFY.
+ *
+ * This file is part of the ongoing work to move the eslintrc-style config
+ * system into the @eslint/eslintrc package. This file needs to remain
+ * unchanged in order for this work to proceed.
+ *
+ * If you think you need to change this file, please contact @nzakas first.
+ *
+ * Thanks in advance for your cooperation.
+ */
+
 /**
  * @fileoverview Tests for config validator.
  * @author Brandon Mills
@@ -13,11 +25,12 @@ const assert = require("chai").assert,
     { Linter } = require("../../../lib/linter"),
     validator = require("../../../lib/shared/config-validator"),
     Rules = require("../../../lib/linter/rules");
-const linter = new Linter();
 
 //------------------------------------------------------------------------------
-// Tests
+// Helpers
 //------------------------------------------------------------------------------
+
+const linter = new Linter();
 
 /**
  * Fake a rule object
@@ -88,6 +101,10 @@ const mockRequiredOptionsRule = {
         };
     }
 };
+
+//------------------------------------------------------------------------------
+// Tests
+//------------------------------------------------------------------------------
 
 describe("Validator", () => {
 
